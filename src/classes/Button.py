@@ -45,7 +45,7 @@ class Button:
         study_path_map = {
             "RAD": "/Volumes/group/PANLab_Datasets/RAD/data",
             "ENGAGE": "/Volumes/group/PANLab_Datasets/ENGAGE/data",
-            "ENGAGE_2": "/Volumes/group/PANLab_Datasets/ENGAGE_2/data"
+            "ENGAGE_2": "/Volumes/group/PANLab_Datasets/ENGAGE_2/data",
             "CONN_HC": "/Volumes/group/PANLab_Datasets/CONNECTOME/conn_hc/data",
             "CONN_MDD": "/Volumes/group/PANLab_Datasets/CONNECTOME/conn_mdd/data",
         }

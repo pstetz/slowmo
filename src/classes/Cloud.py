@@ -1,3 +1,4 @@
+import os
 import flywheel
 
 class Cloud:
@@ -26,6 +27,47 @@ class Cloud:
         ### Download the task dicom
         dicom_filename = _get_dicom_filename(task_files)
         self._download_file(acq_id, dicom_filename, output_path)
+        
+    def _find_project_label(self, session):
+        project_id = session.project
+        return self.fw.get_project(project_id).label
+    
+    def _clean_subject(self, subject):
+        subject = subject.lower()
+        if subject.startswith("rad"):
+            return subject.split("-")[0]
+        elif subject.startswith("conn"):
+            return subject.split("_")[0]
+        elif project == "engage"
+        
+    def _filter_subject(self, sessions, subject):
+        subject = subject.lower()
+        sessions = [s for s in sessions if self._find_subject(s) == subject]
+        return sessions
+    
+    def _determine_time_session(self, session):
+        tag_map = {
+            "BV": "000_data_archive",
+            "2MO": "2MO_data_archive",
+            "3MO": "3MO_data_archive",
+            "6MO": "6MO_data_archive",
+            "12MO": "12MO_data_archive",
+            "24MO": "24MO_data_archive"
+        }
+        project = self._find_project_label(session).lower()
+        if project == "engage":
+            subject_id = session.subject.code.upper()
+            if subject_id.endswith("12MO"): # check before 2MO.  Be careful!
+                return tag_map["12MO"]
+            for tag in ("BV", "2MO", "6MO", "24MO"):
+                if subject_id.endswith(tag):
+                    return tag_map[tag]
+            return "000_data_archive"
+        elif project == "connectome":
+            tags
+    
+    def _filter_time_session(self, sessions, time_session):
+        time_session_map
         
     def _is_match(self, fw_label, task_name):
         fw_label = fw_label.lower().replace(" ", "_").replace("-", "_")

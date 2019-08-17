@@ -24,7 +24,7 @@ class DicomDir:
                 "dicom": dicom
             })
             
-            if first_loc == :
+            if first_loc == dicom.slice_loc: # be careful of last volume
                 volume = {"volume": self.num_volumes, "sheets": sheets}
                 self.num_volumes += 1
                 dicoms.append(volume)
