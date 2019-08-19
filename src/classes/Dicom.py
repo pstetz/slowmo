@@ -5,6 +5,7 @@ import os
 import shutil
 import pydicom
 import zipfile
+import numpy as np
 from tqdm import tqdm
 from glob import glob
 from os.path import join
@@ -37,6 +38,29 @@ class DicomDir:
         print("loading dicoms from %s..." % filepath)
         self.load_dicoms()
 
+    def get_volume(self, index):
+        volume_data = list()
+
+        ### Load and sort relevant sheets
+        volume = self.dicoms[index]
+        sheets = volume["sheets"]
+        sheets = sorted(sheets, key=lambda x: -x["slice_loc"]) # Checked -slice_loc is correct (minus important!)
+
+        ### Load data from sheets
+        for sheet in sheets:
+            volume_data.append(sheet["dicom"].data)
+
+        volume_data = np.array(volume_data)
+        volume_data = self._reshape(volume_data)
+        return volume_data
+
+    def _reshape(self, data, new_shape = (74, 74, 45)):
+        reshaped = np.zeros(new_shape)
+        assert data.shape == (45, 74, 74), "Expected shape (45, 74, 74), found shape %s" % str(data.shape)
+        for i in range(data.shape[0]):
+            reshaped[:, :, i] = data[i, :, :]
+        return reshaped
+
     def _sort_by_trigger_time(self):
         print("Sorting dicoms by trigger time...")
         sorted_dicoms_dict = list()
@@ -59,7 +83,6 @@ class DicomDir:
 
         ### Load all of the available dicoms in the path
         dicoms_sorted = self._sort_by_trigger_time()
-        print("Organizing dicoms in sheets")
         for dicom in tqdm(dicoms_sorted):
             if first_loc is None:
                 first_loc = dicom.slice_loc
