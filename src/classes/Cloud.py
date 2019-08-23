@@ -155,6 +155,22 @@ class Cloud:
             return True
         elif task_name == "nonconscious" and "nonconscious" in fw_label:
             return True
+        elif task_name == "rs1_pe0" and ("rsfmri" in fw_label and "_1_pe0" in fw_label):
+            return True
+        elif task_name == "rs1_pe1" and ("rsfmri" in fw_label and "_1_pe1" in fw_label):
+            return True
+        elif task_name == "rs2_pe0" and ("rsfmri" in fw_label and "_2_pe0" in fw_label):
+            return True
+        elif task_name == "rs2_pe1" and ("rsfmri" in fw_label and "_2_pe1" in fw_label):
+            return True
+        elif task_name == "mid" and "tfmri_mid" in fw_label:
+            return True
+        elif task_name == "emotion" and "tfmri_emotion" in fw_label:
+            return True
+        elif task_name == "wm" and "tfmri_wm" in fw_label:
+            return True
+        elif task_name == "gambling" and "tfmri_gambling" in fw_label:
+            return True
         return False
 
     def _get_dicom_filename(self, acq_id):
