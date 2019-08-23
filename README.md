@@ -26,6 +26,7 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Decide if modeling on dicoms is better or if processed images would work
 - Collect all demographic information that should go in model
+- Allow DicomDir to work with multiband scans
 
 
 ### Acknowledgements
