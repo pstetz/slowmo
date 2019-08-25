@@ -26,11 +26,14 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Decide if modeling on dicoms is better or if processed images would work
 - Collect all demographic information that should go in model
-- Allow DicomDir to work with multiband scans
 
 
 ### Acknowledgements
 
 The team whose paper heavily inspired me and their [paper](https://people.cs.umass.edu/~hzjiang//projects/superslomo/).
+
+Helpful tensorflow links:  
+- [Learning regression](https://www.tensorflow.org/tutorials/keras/basic_regression)  
+-
 
 Huaizu Jiang, Deqing Sun, Varun Jampani, Ming-Hsuan Yang, Erik Learned-Miller, Jan Kautz. Super SloMo: High Quality Estimation of Multiple Intermediate Frames for Video Interpolation. CVPR, 2018 (spotlight). [[PDF](https://arxiv.org/pdf/1712.00080.pdf)][[CVPR spotlight video](https://people.cs.umass.edu/~hzjiang//projects/superslomo/superslomo_cvpr18_spotlight_v4.mp4)]
