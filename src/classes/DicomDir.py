@@ -36,15 +36,19 @@ class DicomDir:
             filepath = self._unzip_rm(filepath)
         self.directory = filepath
         print("loading dicoms from %s..." % filepath)
-        self.load_dicoms()
+        self._load_dicoms()
+        self._load_shape()
+
+    def _load_shape(self):
+        volume = self.get_volume(0)
+        volume_shape = volume.shape
+        shape = [volume_shape[0], volume_shape[1], volume_shape[2], self.num_volumes]
+        self.shape = shape
+        return shape
 
     def get_volume(self, index):
         volume_data = list()
-
-        ### Load and sort relevant sheets
-        volume = self.dicoms[index]
-        sheets = volume["sheets"]
-        sheets = sorted(sheets, key=lambda x: -x["slice_loc"]) # Checked -slice_loc is correct (minus important!)
+        sheets = self._get_sheets(index)
 
         ### Load data from sheets
         for sheet in sheets:
@@ -53,6 +57,16 @@ class DicomDir:
         volume_data = np.array(volume_data)
         volume_data = self._reshape(volume_data)
         return volume_data
+
+    def _get_sheets(self, t):
+        ### Load and sort relevant sheets
+        volume = self.dicoms[t]
+        sheets = volume["sheets"]
+        return sorted(sheets, key=lambda x: -x["slice_loc"]) # Checked -slice_loc is correct (minus important!)
+
+    def _get_trigger_time(self, z, t):
+        sheets = self.get_sheets(t)
+        return sheets[z]["trigger_time"]
 
     def _reshape(self, data, new_shape = (74, 74, 45)):
         reshaped = np.zeros(new_shape)
@@ -72,7 +86,7 @@ class DicomDir:
         sorted_dicoms = [dicom["dicom"] for dicom in sorted_dicoms_dict]
         return sorted_dicoms
 
-    def load_dicoms(self):
+    def _load_dicoms(self):
         """
         NOTE: it may be too memory intensive to keep all the dicoms in memory.
         Especially when the model is running
@@ -108,10 +122,11 @@ class DicomDir:
         self.dicoms = dicoms
         return dicoms
 
-    def _cut_volumes(self, num_volumes):
-        assert num_volumes < len(self.num_volumes), "Cannot cut %d volumes when only %d exist!" % (num_volumes, self.num_volumes)
+    def cut_volumes(self, num_volumes):
+        assert num_volumes < self.num_volumes, "Cannot cut %d volumes when only %d exist!" % (num_volumes, self.num_volumes)
         self.dicoms = self.dicoms[num_volumes:]
         self.num_volumes -= num_volumes
+        self.shape = (self.shape[0], self.shape[1], self.shape[2], self.shape[3] - num_volumes)
         return self.dicoms
 
 
