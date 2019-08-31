@@ -36,13 +36,15 @@ def _valid_patient(patient, dicom_path, button, logger):
 def _train_task(project, task, onsets, data, patient, is_ascending):
     for num_volume in len(data.shape[-1]):
         df = _gen_data(project, task, onsets, volume, patient, is_ascending, num_volume)
+        model.train(df)
 
-def _volume_data(data, x, y, z, t, direction, radius):
+def _volume_data(dicoms, x, y, z, t, direction, radius):
     row = dict()
+    volume = dicoms.get_volume(t + direction)
     for coord in voxel_radius(radius):
         i, j, k  = coord["x"], coord["y"], coord["z"]
         loc      = "i%d_j%d_k%d_t%d" % (i, j, k, direction)
-        row[loc] = data[x+i, y+j ,z+k, t+direction]
+        row[loc] = volume[x+i, y+j ,z+k]
     return row
 
 def _gen_avail_volumes(shape, radius):
@@ -55,12 +57,18 @@ def _gen_avail_volumes(shape, radius):
            ]
 
 def _gen_data(project, task, onsets, dicoms, patient, is_ascending, num_volume, radius=5):
-    avail_volumes = _gen_avail_volumes(dicoms.shape)
-    for x, y, z in avail_volumes:
+    avail_volumes = _gen_avail_volumes(dicoms.shape, radius)
+    curr_volume   = dicoms.get_volume(num_volume)
+    rows = list()
+    for x, y, z in tqdm(avail_volumes):
         _prev = _volume_data(dicoms, x, y, z, num_volume, -1, radius)
-        _next = _volume_data(dicoms, x, y, z, num_volume,  1, radius)
+        _next = _volume_data(dicoms, x, y, z, num_volume, 1,  radius)
         row = {**_prev, **_next}
-        row["signal"] = data[x, y, z, num_volume]
+        row["signal"] = curr_volume[x, y, z]
+        row["x"] = x
+        row["y"] = y
+        row["z"] = z
+        rows.append(row)
     df = pd.DataFrame(rows)
 
     ### patient data
@@ -68,16 +76,15 @@ def _gen_data(project, task, onsets, dicoms, patient, is_ascending, num_volume, 
 #     df["is_female"] = (patient.gender == "female")
 
     ### Project data
-    df["is_rad"]        = (project == "rad")
-    df["is_engage"]     = (project == "engage")
-    df["is_connectome"] = (project == "connectome")
+    df["is_rad"]        = int(project == "rad")
+    df["is_engage"]     = int(project == "engage")
+    df["is_connectome"] = int(project == "connectome")
 
     ### task data
-    df["is_gng"] = (task == "gonogo")
-    df["is_fc"]  = (task == "conscious")
-    df["is_fnc"] = (task == "nonconscious")
+    df["is_gng"] = int(task == "gonogo")
+    df["is_fc"]  = int(task == "conscious")
+    df["is_fnc"] = int(task == "nonconscious")
 
     ### fMRI data
     df["ascending"] = int(is_ascending)
     return df
-
