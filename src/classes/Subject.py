@@ -3,11 +3,23 @@ from os.path import join
 
 class Subject:
     def __init__(self, project, subject_id):
-        self.project = project
         self.subject = subject_id
+        self._determine_project()
+
         df = self._get_df()
         self.get_age(df)
         self.get_sex(df)
+
+    def _determine_project():
+        subject = self.subject.lower()
+        if subject.startswith("conn"):
+            project = "connectome"
+        elif subject.startswith("rad"):
+            project = "rad"
+        else:
+            project = "engage"
+        self.project = project
+        return project
 
     def _get_df(self):
         data_root = "../../data/project"
