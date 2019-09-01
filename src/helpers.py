@@ -86,5 +86,6 @@ def _gen_data(project, task, onsets, dicoms, patient, is_ascending, num_volume, 
     df["is_fnc"] = int(task == "nonconscious")
 
     ### fMRI data
-    df["ascending"] = int(is_ascending)
+    df["is_ascending"] = int(is_ascending)
     return df
+

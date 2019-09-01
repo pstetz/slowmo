@@ -127,7 +127,7 @@ class DicomDir:
         self.dicoms = self.dicoms[num_volumes:]
         self.num_volumes -= num_volumes
         self.shape = (self.shape[0], self.shape[1], self.shape[2], self.shape[3] - num_volumes)
-        return self.dicoms
+        return self
 
 
     """
