@@ -27,6 +27,9 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Decide if modeling on dicoms is better or if processed images would work
 - Collect all demographic information that should go in model
 
+### Notes
+- Feather does support float 16
+- Going from float64 to float32 had a memory saving from 1.18 GB to 593.6 MB
 
 ### Acknowledgements
 
