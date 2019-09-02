@@ -1,4 +1,6 @@
+import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 def voxel_radius(radius):
     valid = list()
@@ -56,24 +58,33 @@ def _gen_avail_volumes(shape, radius):
                       for z in range(z_min, z_max)
            ]
 
-def _gen_data(project, task, onsets, dicoms, patient, is_ascending, num_volume, radius=5):
+def _add_map(data, _map):
+    for key in _map:
+        _add_value(data, key, _map[key])
+
+def _add_value(data, key, value):
+    if not key in data:
+        data[key] = list()
+    data[key].append(value)
+
+def gen_data(project, task, onsets, dicoms, patient, num_volume, radius=5):
     avail_volumes = _gen_avail_volumes(dicoms.shape, radius)
     curr_volume   = dicoms.get_volume(num_volume)
-    rows = list()
+    data = dict()
     for x, y, z in tqdm(avail_volumes):
         _prev = _volume_data(dicoms, x, y, z, num_volume, -1, radius)
         _next = _volume_data(dicoms, x, y, z, num_volume, 1,  radius)
-        row = {**_prev, **_next}
-        row["signal"] = curr_volume[x, y, z]
-        row["x"] = x
-        row["y"] = y
-        row["z"] = z
-        rows.append(row)
-    df = pd.DataFrame(rows)
+        _add_map(data, _prev)
+        _add_map(data, _next)
+        _add_value(data, "signal", curr_volume[x, y, z])
+        _add_value(data, "x", x)
+        _add_value(data, "y", y)
+        _add_value(data, "z", z)
+    df = pd.DataFrame(data)
 
     ### patient data
-#     df["age"] = patient.age
-#     df["is_female"] = (patient.gender == "female")
+    df["age"]       = patient.age
+    df["is_female"] = int(patient.sex == "female")
 
     ### Project data
     df["is_rad"]        = int(project == "rad")
@@ -86,6 +97,12 @@ def _gen_data(project, task, onsets, dicoms, patient, is_ascending, num_volume, 
     df["is_fnc"] = int(task == "nonconscious")
 
     ### fMRI data
-    df["is_ascending"] = int(is_ascending)
+    df["is_ascending"] = int(dicoms.is_ascending)
+    return df
+
+def convert_float64_to_float32(df):
+    for col in tqdm(df.columns):
+        if df[col].dtype == np.float64:
+            df[col] = df[col].astype(np.float32)
     return df
 

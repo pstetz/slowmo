@@ -38,7 +38,6 @@ class Subject:
         assert len(subject) != 0, "Subject %s not found" % self.subject
         assert len(subject) == 1, "Multiple subjects with id %s found" % self.subject
         info = subject.to_dict()
-        print(info)
         info = {k: list(info[k].values()).pop() for k in info}
         return info
 
