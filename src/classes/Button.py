@@ -1,11 +1,12 @@
 import os
+import pandas as pd
 from tqdm import tqdm
 from glob import glob
 from os.path import join
 
 class Button:
     def __init__(self):
-        self.buttons = list()
+        self.onsets = list()
 
     def find_all_logs(self, studies):
         for study in studies:
@@ -27,20 +28,20 @@ class Button:
         for task_path in task_paths:
             task = self._determine_task_name(task_path)
             onsets = Onsets(study, subject, time_session, task_path, task)
-            self.buttons.append(onsets)
+            self.onsets.append(onsets)
 
     def get(self, study=None, subject_id=None, time_session=None, task=None):
-        buttons = self.buttons
-        buttons = [button for button in buttons if button.valid]
+        onsets = self.onsets
+        onsets = [button for button in onsets if button.valid]
         if study:
-            buttons = [button for button in buttons if button.study == study]
+            onsets = [button for button in onsets if button.study == study]
         if subject_id:
-            buttons = [button for button in buttons if button.subject_id == subject_id]
+            onsets = [button for button in onsets if button.subject_id == subject_id]
         if time_session:
-            buttons = [button for button in buttons if button.time_session == time_session]
+            onsets = [button for button in onsets if button.time_session == time_session]
         if task:
-            buttons = [button for button in buttons if button.task == task]
-        return buttons
+            onsets = [button for button in onsets if button.task == task]
+        return onsets
 
     def _connectome_hc_mdd(self, study, subject):
         subject = subject.lower()
@@ -95,3 +96,20 @@ class Onsets:
         elif self.task == "conscious" or self.task == "nonconscious":
             self.valid = (len(self.onset_paths) == 6)
         return False
+
+    def _determine_onset(self, filepath):
+        filename = os.path.basename(filepath).lower()
+        filename = filename.replace("_onsets.csv", "")
+        return filename
+
+    def combine_onsets(self):
+        dfs = list()
+        for path in self.onset_paths:
+            tmp = pd.read_csv(path)
+            tmp["onset"] = self._determine_onset(path)
+            dfs.append(tmp)
+        df = pd.concat(dfs)
+        df.sort_values("num", inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        return df
+
