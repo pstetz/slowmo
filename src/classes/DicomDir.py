@@ -38,6 +38,7 @@ class DicomDir:
         print("loading dicoms from %s..." % filepath)
         self._load_dicoms()
         self._load_shape()
+        self.determine_slice_order()
 
     def _load_shape(self):
         volume = self.get_volume(0)
@@ -86,6 +87,19 @@ class DicomDir:
         sorted_dicoms = [dicom["dicom"] for dicom in sorted_dicoms_dict]
         return sorted_dicoms
 
+    def determine_slice_order(self):
+        first_volume = self.dicoms[0]
+        first_sheet = min(first_volume["sheets"], key=lambda x: x["trigger_time"])
+        first_loc = first_sheet["slice_loc"]
+        if first_loc < 0:
+            slice_order = "ascending"
+        elif first_loc > 0:
+            slice_order = "descending"
+        else:
+            raise Exception("%s does not have a valid slice loc %.2f" % (self.directory, first_loc))
+        self.is_ascending = int(slice_order == "ascending")
+        return slice_order
+
     def _load_dicoms(self):
         """
         NOTE: it may be too memory intensive to keep all the dicoms in memory.
@@ -127,6 +141,13 @@ class DicomDir:
         self.dicoms = self.dicoms[num_volumes:]
         self.num_volumes -= num_volumes
         self.shape = (self.shape[0], self.shape[1], self.shape[2], self.shape[3] - num_volumes)
+        for i in range(len(self.dicoms)):
+            self.dicoms[i]["volume"] -= num_volumes
+            sheets = self.dicoms[i]["sheets"]
+            for j in range(len(sheets)):
+                TR = sheets[j]["dicom"].dicom.RepetitionTime
+                sheets[j]["trigger_time"] -= TR * num_volumes
+            self.dicoms[i]["sheets"] = sheets
         return self
 
 
