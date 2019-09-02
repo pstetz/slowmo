@@ -1,36 +1,37 @@
 import os
+from tqdm import tqdm
 from glob import glob
 from os.path import join
 
 class Button:
-    def __init__(self, studies):
-        self.studies = studies
+    def __init__(self):
         self.buttons = list()
-        self.find_logs()
 
-    def find_all_logs(self):
+    def find_all_logs(self, studies):
         for study in studies:
-            study_root = self.get_study_root(study)
-            self.find_study_logs(study, study_path)
+            study_root = self._get_study_root(study)
+            self.find_study_logs(study, study_root)
 
-    def find_study_logs(self, study_path):
-        for subject_path in glob(join(study_path, "*")):
+    def find_study_logs(self, study, study_root):
+        for subject_path in tqdm(glob(join(study_root, "*"))):
             subject = os.path.basename(subject_path)
             for time_session_path in glob(join(subject_path, "*")):
                 time_session = os.path.basename(time_session_path)
-                self.find_subject_session_logs(self, study, subject, time_session, time_session_path)
+                self.find_subject_session_logs(study, subject, time_session, time_session_path)
 
-    def find_subject_session_logs(self, study, subject, time_session, time_session_path):
-        fmri_folder = join(time_session_path, "100_fMRI")
+    def find_subject_session_logs(self, study, subject, time_session):
+        study = self._connectome_hc_mdd(study, subject)
+        study_root = self._get_study_root(study)
+        fmri_folder = join(study_root, subject.upper(), time_session, "100_fMRI")
         task_paths  = glob(join(fmri_folder, "10*"))
         for task_path in task_paths:
-            task = self.determine_task_name(task_path)
-            onsets = Onsets(task_path, task, study, subject, time_session)
+            task = self._determine_task_name(task_path)
+            onsets = Onsets(study, subject, time_session, task_path, task)
             self.buttons.append(onsets)
 
-    def _get(self, study=None, subject_id=None, time_session=None, task=None):
+    def get(self, study=None, subject_id=None, time_session=None, task=None):
         buttons = self.buttons
-        buttons = [button for button in button if button.valid]
+        buttons = [button for button in buttons if button.valid]
         if study:
             buttons = [button for button in buttons if button.study == study]
         if subject_id:
@@ -41,20 +42,42 @@ class Button:
             buttons = [button for button in buttons if button.task == task]
         return buttons
 
-    def get_study_root(self, study):
+    def _connectome_hc_mdd(self, study, subject):
+        subject = subject.lower()
+        if not subject.startswith("conn"):
+            return study
+        if subject.startswith("conn0"):
+            return "conn_hc"
+        elif subject.startswith("conn1") or subject.startswith("conn2"):
+            return "conn_mdd"
+        raise Exception("Cannot determine study for subject %s" % subject)
+
+    def _determine_task_name(self, task_path):
+        folder_name = os.path.basename(task_path)
+        task_map = {
+                "101_fMRI_preproc_GO_NO_GO": "gonogo",
+                "103_fMRI_preproc_FACES-CONSCIOUS": "conscious",
+                "105_fMRI_preproc_FACES-NONCONSCIOUS": "nonconscious",
+        }
+        return task_map[folder_name]
+
+    def _get_study_root(self, study):
         data_root = "/Volumes/group/PANLab_Datasets"
         study_path_map = {
             "RAD": join(data_root, "RAD", "data"),
             "ENGAGE": join(data_root, "ENGAGE", "data"),
             "ENGAGE_2": join(data_root, "ENGAGE_2", "data"),
-            "CONN_HC": join(data_root, "CONNECTOME", "conn_hc", "data"),
-            "CONN_MDD": jojin(data_root, "CONNECTOME", "conn_mdd", "data"),
+            "CONN_HC": join(data_root, "CONNECTOME", "conn_hc", "dof-6", "data"),
+            "CONN_MDD": join(data_root, "CONNECTOME", "conn_mdd", "dof-6", "data"),
         }
-        return study_path_map[study]
+        return study_path_map[study.upper()]
 
 
 class Onsets:
-    def __init__(self, onset_folder, task):
+    def __init__(self, project, subject, time_session, onset_folder, task):
+        self.project = project
+        self.subject = subject
+        self.time_session = time_session
         self.onset_folder = onset_folder
         self.task = task
 
