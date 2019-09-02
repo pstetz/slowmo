@@ -39,6 +39,7 @@ class DicomDir:
         self._load_dicoms()
         self._load_shape()
         self.determine_slice_order()
+        self.get_operator()
 
     def _load_shape(self):
         volume = self.get_volume(0)
@@ -100,6 +101,14 @@ class DicomDir:
         self.is_ascending = int(slice_order == "ascending")
         return slice_order
 
+    def get_operator(self):
+        first_volume = self.dicoms[0]
+        first_sheet  = first_volume["sheets"][0]
+        dicom = first_sheet["dicom"].dicom
+        operator = dicom.OperatorsName
+        self.operator = operator
+        return operator
+
     def _load_dicoms(self):
         """
         NOTE: it may be too memory intensive to keep all the dicoms in memory.
@@ -111,7 +120,7 @@ class DicomDir:
 
         ### Load all of the available dicoms in the path
         dicoms_sorted = self._sort_by_trigger_time()
-        for dicom in tqdm(dicoms_sorted):
+        for dicom in dicoms_sorted:
             if first_loc is None:
                 first_loc = dicom.slice_loc
             elif dicom.slice_loc == first_loc:
