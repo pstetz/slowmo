@@ -8,33 +8,33 @@ class Button:
     def __init__(self):
         self.onsets = list()
 
-    def find_all_logs(self, studies):
-        for study in studies:
-            study_root = self._get_study_root(study)
-            self.find_study_logs(study, study_root)
+    def find_all_logs(self, projects):
+        for project in projects:
+            project_root = self._get_project_root(project)
+            self.find_project_logs(project, project_root)
 
-    def find_study_logs(self, study, study_root):
-        for subject_path in tqdm(glob(join(study_root, "*"))):
+    def find_project_logs(self, project, project_root):
+        for subject_path in tqdm(glob(join(project_root, "*"))):
             subject = os.path.basename(subject_path)
             for time_session_path in glob(join(subject_path, "*")):
                 time_session = os.path.basename(time_session_path)
-                self.find_subject_session_logs(study, subject, time_session, time_session_path)
+                self.find_subject_session_logs(project, subject, time_session, time_session_path)
 
-    def find_subject_session_logs(self, study, subject, time_session):
-        study = self._connectome_hc_mdd(study, subject)
-        study_root = self._get_study_root(study)
-        fmri_folder = join(study_root, subject.upper(), time_session, "100_fMRI")
+    def find_subject_session_logs(self, project, subject, time_session):
+        project = self._connectome_hc_mdd(project, subject)
+        project_root = self._get_project_root(project)
+        fmri_folder = join(project_root, subject.upper(), time_session, "100_fMRI")
         task_paths  = glob(join(fmri_folder, "10*"))
         for task_path in task_paths:
             task = self._determine_task_name(task_path)
-            onsets = Onsets(study, subject, time_session, task_path, task)
+            onsets = Onsets(project, subject, time_session, task_path, task)
             self.onsets.append(onsets)
 
-    def get(self, study=None, subject_id=None, time_session=None, task=None):
+    def get(self, project=None, subject_id=None, time_session=None, task=None):
         onsets = self.onsets
         onsets = [button for button in onsets if button.valid]
-        if study:
-            onsets = [button for button in onsets if button.study == study]
+        if project:
+            onsets = [button for button in onsets if button.project == project]
         if subject_id:
             onsets = [button for button in onsets if button.subject_id == subject_id]
         if time_session:
@@ -43,15 +43,15 @@ class Button:
             onsets = [button for button in onsets if button.task == task]
         return onsets
 
-    def _connectome_hc_mdd(self, study, subject):
+    def _connectome_hc_mdd(self, project, subject):
         subject = subject.lower()
         if not subject.startswith("conn"):
-            return study
+            return project
         if subject.startswith("conn0"):
             return "conn_hc"
         elif subject.startswith("conn1") or subject.startswith("conn2"):
             return "conn_mdd"
-        raise Exception("Cannot determine study for subject %s" % subject)
+        raise Exception("Cannot determine project for subject %s" % subject)
 
     def _determine_task_name(self, task_path):
         folder_name = os.path.basename(task_path)
@@ -62,16 +62,16 @@ class Button:
         }
         return task_map[folder_name]
 
-    def _get_study_root(self, study):
+    def _get_project_root(self, project):
         data_root = "/Volumes/group/PANLab_Datasets"
-        study_path_map = {
+        project_path_map = {
             "RAD": join(data_root, "RAD", "data"),
             "ENGAGE": join(data_root, "ENGAGE", "data"),
             "ENGAGE_2": join(data_root, "ENGAGE_2", "data"),
             "CONN_HC": join(data_root, "CONNECTOME", "conn_hc", "dof-6", "data"),
             "CONN_MDD": join(data_root, "CONNECTOME", "conn_mdd", "dof-6", "data"),
         }
-        return study_path_map[study.upper()]
+        return project_path_map[project.upper()]
 
 
 class Onsets:
