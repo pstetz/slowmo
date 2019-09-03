@@ -53,10 +53,10 @@ def _gen_avail_volumes(shape, radius):
     x_min, x_max = radius, shape[0] - radius
     y_min, y_max = radius, shape[1] - radius
     z_min, z_max = radius, shape[2] - radius
-    return [(x, y, z) for x in range(x_min, x_max)
+    return np.array([(x, y, z) for x in range(x_min, x_max)
                       for y in range(y_min, y_max)
                       for z in range(z_min, z_max)
-           ]
+           ])
 
 def _add_map(data, _map):
     for key in _map:
@@ -67,19 +67,55 @@ def _add_value(data, key, value):
         data[key] = list()
     data[key].append(value)
 
+def most_recent_onset(df, onset_names, time):
+    df = df[df.ons < time]
+    most_recent = dict()
+    for name in onset_names:
+        tmp = df[df.onset == name]
+        recent_ons = tmp.tail(1)["ons"].values
+        if len(recent_ons) == 0:
+            most_recent[name] = time - 100 # Put the onset time to 100 seconds in the past
+        else:
+            most_recent[name] = recent_ons[0]
+    return most_recent
+
+def recent_onsets(df, trigger_time):
+    onset_names = df.onset.unique()
+    time = trigger_time / 1000
+    recent_onset = most_recent_onset(df, onset_names, time)
+    onset_diff = {k: v - trigger_time/1000 for k, v in recent_onset.items()}
+    return onset_diff
+
+def _format_onsets(onsets):
+    all_onsets = ["go", "nogo", "anger", "happy", "neutral", "fear", "disgust", "sad"]
+    for onset in all_onsets:
+        if onset not in onsets:
+            onsets[onset] = -100
+    return onsets
+
 def gen_data(project, task, onsets, dicoms, patient, num_volume, radius=5):
     avail_volumes = _gen_avail_volumes(dicoms.shape, radius)
     curr_volume   = dicoms.get_volume(num_volume)
+    onset_df = onsets.combine_onsets()
     data = dict()
-    for x, y, z in tqdm(avail_volumes):
+    idx = np.random.randint(len(avail_volumes), size=len(avail_volumes) // 10)
+    choosen_volumes = avail_volumes[idx, :]
+    for x, y, z in tqdm(choosen_volumes):
+        trigger_time = dicoms.get_trigger_time(z, num_volume)
+
         _prev = _volume_data(dicoms, x, y, z, num_volume, -1, radius)
         _next = _volume_data(dicoms, x, y, z, num_volume, 1,  radius)
         _add_map(data, _prev)
         _add_map(data, _next)
+        _add_value(data, "time", trigger_time)
         _add_value(data, "signal", curr_volume[x, y, z])
         _add_value(data, "x", x)
         _add_value(data, "y", y)
         _add_value(data, "z", z)
+
+        stimuli = recent_onsets(onset_df, trigger_time)
+        stimuli = _format_onsets(stimuli)
+        _add_map(data, stimuli)
     df = pd.DataFrame(data)
 
     ### patient data

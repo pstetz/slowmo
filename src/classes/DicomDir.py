@@ -66,7 +66,7 @@ class DicomDir:
         sheets = volume["sheets"]
         return sorted(sheets, key=lambda x: -x["slice_loc"]) # Checked -slice_loc is correct (minus important!)
 
-    def _get_trigger_time(self, z, t):
+    def get_trigger_time(self, z, t):
         sheets = self.get_sheets(t)
         return sheets[z]["trigger_time"]
 
