@@ -50,7 +50,7 @@ class DicomDir:
 
     def get_volume(self, index):
         volume_data = list()
-        sheets = self._get_sheets(index)
+        sheets = self.get_sheets(index)
 
         ### Load data from sheets
         for sheet in sheets:
@@ -60,7 +60,7 @@ class DicomDir:
         volume_data = self._reshape(volume_data)
         return volume_data
 
-    def _get_sheets(self, t):
+    def get_sheets(self, t):
         ### Load and sort relevant sheets
         volume = self.dicoms[t]
         sheets = volume["sheets"]
