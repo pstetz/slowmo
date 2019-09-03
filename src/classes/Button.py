@@ -27,6 +27,8 @@ class Button:
         task_paths  = glob(join(fmri_folder, "10*"))
         for task_path in task_paths:
             task = self._determine_task_name(task_path)
+            if not task:
+                continue
             onsets = Onsets(project, subject, time_session, task_path, task)
             self.onsets.append(onsets)
 
@@ -60,6 +62,8 @@ class Button:
                 "103_fMRI_preproc_FACES-CONSCIOUS": "conscious",
                 "105_fMRI_preproc_FACES-NONCONSCIOUS": "nonconscious",
         }
+        if not folder_name in task_map:
+            return False
         return task_map[folder_name]
 
     def _get_project_root(self, project):
