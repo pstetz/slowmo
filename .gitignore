@@ -3,3 +3,4 @@
 data
 __pycache__
 dev
+*.h5
