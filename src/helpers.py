@@ -93,50 +93,49 @@ def _format_onsets(onsets):
             onsets[onset] = -100
     return onsets
 
-def gen_data(project, task, onsets, dicoms, patient, num_volume, radius=5):
+def gen_data(dicoms, num_volume, onsets,
+        radius=5, percent_sample=0, low_memory=True):
     avail_volumes = _gen_avail_volumes(dicoms.shape, radius)
     curr_volume   = dicoms.get_volume(num_volume)
     onset_df = onsets.combine_onsets()
     data = dict()
-    idx = np.random.randint(len(avail_volumes), size=len(avail_volumes) // 10)
-    choosen_volumes = avail_volumes[idx, :]
-    for x, y, z in tqdm(choosen_volumes):
+
+    ### Restrict to sample
+    if percent_sample:
+        N = len(avail_volumes)
+        idx = np.random.randint(N, size=int(N * percent_sample))
+        avail_volumes = avail_volumes[idx, :]
+
+    ### Generate dataframe
+    for x, y, z in tqdm(avail_volumes):
+        curr_row           = _gen_curr_row(dicoms, x, y, z, num_volume, radius)
+        curr_row["signal"] = curr_volume[x, y, z]
+        _add_map(data, curr_row)
+
         trigger_time = dicoms.get_trigger_time(z, num_volume)
-
-        _prev = _volume_data(dicoms, x, y, z, num_volume, -1, radius)
-        _next = _volume_data(dicoms, x, y, z, num_volume, 1,  radius)
-        _add_map(data, _prev)
-        _add_map(data, _next)
-        _add_value(data, "time", trigger_time)
-        _add_value(data, "signal", curr_volume[x, y, z])
-        _add_value(data, "x", x)
-        _add_value(data, "y", y)
-        _add_value(data, "z", z)
-
         stimuli = recent_onsets(onset_df, trigger_time)
         stimuli = _format_onsets(stimuli)
         _add_map(data, stimuli)
+
     df = pd.DataFrame(data)
-
-    ### patient data
-    df["age"]       = patient.age
-    df["is_female"] = int(patient.sex == "female")
-
-    ### Project data
-    df["is_rad"]        = int(project == "rad")
-    df["is_engage"]     = int(project == "engage")
-    df["is_connectome"] = int(project == "connectome")
-
-    ### task data
-    df["is_gng"] = int(task == "gonogo")
-    df["is_fc"]  = int(task == "conscious")
-    df["is_fnc"] = int(task == "nonconscious")
-
-    ### fMRI data
-    df["is_ascending"] = int(dicoms.is_ascending)
+    if low_memory:
+        df = _convert_float64_to_float32(df)
     return df
 
-def convert_float64_to_float32(df):
+def _gen_curr_row(dicoms, x, y, z, num_volume, radius):
+    trigger_time = dicoms.get_trigger_time(z, num_volume)
+
+    _prev = _volume_data(dicoms, x, y, z, num_volume, -1, radius)
+    _next = _volume_data(dicoms, x, y, z, num_volume, 1,  radius)
+
+    curr_row = {**_prev, **_next}
+    curr_row["time"]   = trigger_time
+    curr_row["x"]      = x
+    curr_row["y"]      = y
+    curr_row["z"]      = z
+    return curr_row
+
+def _convert_float64_to_float32(df):
     for col in tqdm(df.columns):
         if df[col].dtype == np.float64:
             df[col] = df[col].astype(np.float32)
