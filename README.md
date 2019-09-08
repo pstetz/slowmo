@@ -9,6 +9,11 @@ One problem in MRI imagining is the low resolution temporal resolution of imagin
 
 This project attempts to alleviate both of these issues by making use of advances in Deep Learning technology.  A team from NVIDIA has created a model that can create high quality slow motion videos from regular videos.  The problems faced here are essentially the same.  We want to create regular videos from extremely choppy snapshots.
 
+### Introduction
+In the original SlowMo [paper presented here](https://people.cs.umass.edu/~hzjiang//projects/superslomo/) [and here](https://arxiv.org/abs/1712.00080), the team trained on 1,132 Youtube videos or 300K individual frames.
+
+While this sounds like a lot we have just as much.  CONNECTOME, ENGAGE, and RAD have a combined ~1,500 sessions on Flywheel and a estimate of 3 tasks per session and 150 volumes per task mean we have 675,000 individual frames
+
 
 ### Classes
 
