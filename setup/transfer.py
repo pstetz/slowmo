@@ -20,22 +20,39 @@ def transfer(project, src_folder, dst_folder):
         for subject_time_path in glob( join(subject_path, "*") ):
             time_session = os.path.basename(subject_time_path)
 
+            ### Transfer structural
+            for struct, name in [
+                    ("FSL_segmentation/w_FSL_greymatter_mask", "gm_probseg"),
+                    ("reg/highres2standard_warp", "subject_to_MNI_warp"),
+            ]:
+                src = join(subject_time_path, "200_sMRI/003_FSL_fineFNIRT", struct)
+                src = _prefer_compressed(src)
+                if src:
+                    dst = _determine_dst(dst_folder, project, subject, time_session, "structural", filename=name)
+                    _safe_copy(src, dst)
+
+            ### Transfer functionals
             for task_path in glob( join(subject_time_path, "100_fMRI", "10*") ):
                 task_folder = os.path.basename(task_path)
                 src = _plip_path(subject_time_path, task_folder, filename = "wa01_normalized_func_data")
-
                 if src:
                     dst = _determine_dst(dst_folder, project, subject, time_session, task_folder)
-                    dst = _match_ext(dst, src)
-                    _copy(src, dst)
-                    _compress(dst)
+                    _safe_copy(src, dst)
+
     return
 
-def _determine_dst(dst_folder, project, subject, time_session, task_folder):
+def _safe_copy(src, dst):
+    dst = _match_ext(dst, src)
+    _copy(src, dst)
+    _compress(dst)
+    _uncompress(dst)
+
+def _determine_dst(dst_folder, project, subject, time_session, folder, filename="normalized"):
     time    = time_session.replace("_data_archive", "")
     subject = subject.lower().replace("_", "").replace("-", "")
-    task    = _task_map()[task_folder]
-    dst     = join(dst_folder, project, time, subject, task, "normalized")
+    if folder in _task_map():
+        folder = _task_map()[folder]
+    dst = join(dst_folder, project, time, subject, folder, filename)
     return dst
 
 
@@ -64,17 +81,21 @@ def _plip_path(subject_time_folder, task_folder, filename = "wa01_normalized_fun
 File system
 """
 def _prefer_compressed(filepath):
-    for ext in (".nii.gz", ".nii"):
+    for ext in (".nii.gz", ".nii", ".nii.tar.gz"):
         if os.path.isfile(filepath + ext):
             return filepath + ext
     return False
 
 def _cut_ext(filepath):
     filename = os.path.basename(filepath)
-    parts = filename.split(".")
-    name = parts[0]
-    ext = "." + ".".join(parts[1:])
-    return join(name, os.path.dirname(filepath)), ext
+    if "." in filename:
+        parts = filename.split(".")
+        name = parts[0]
+        path = join(name, os.path.dirname(filepath))
+        ext = "." + ".".join(parts[1:])
+    else:
+        path, ext = filepath, ""
+    return path, ext
 
 def _match_ext(path_1, path_2):
     path, _ = _cut_ext(path_1)
@@ -84,6 +105,17 @@ def _match_ext(path_1, path_2):
 def _remove(filepath):
     if os.path.isfile(filepath):
         os.remove(filepath)
+
+def _uncompress(compress_path):
+    if not compress_path.endswith(".tar.gz"):
+        return
+    uncompress_path = compress_path.replace(".tar.gz", ".gz")
+    _remove(uncompress_path)
+    with tarfile.open(compress_path, "r:gz") as f_in:
+        f_in.extractall()
+        with gzip.open(uncompress_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    os.remove(compress_path)
 
 def _compress(uncompress_path):
     if uncompress_path.endswith(".gz"):
@@ -98,7 +130,7 @@ def _compress(uncompress_path):
 def _copy(src, dst):
     assert os.path.isfile(src), "%s not a file" % src
     if os.path.isfile(dst):
-        print("%s already exists.  Will not overwrite" % dst)
+        # print("%s already exists.  Will not overwrite" % dst)
         return
     folder = os.path.dirname(dst)
     if not os.path.isdir(folder):
