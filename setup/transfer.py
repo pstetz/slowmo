@@ -4,6 +4,8 @@ Imports
 import os
 import gzip
 import shutil
+import tarfile
+import subprocess
 import nibabel as nib
 from glob import glob
 from tqdm import tqdm
@@ -34,18 +36,32 @@ def transfer(project, src_folder, dst_folder):
             ### Transfer functionals
             for task_path in glob( join(subject_time_path, "100_fMRI", "10*") ):
                 task_folder = os.path.basename(task_path)
+                if task_folder not in _task_map():
+                    continue
                 src = _plip_path(subject_time_path, task_folder, filename = "wa01_normalized_func_data")
                 if src:
                     dst = _determine_dst(dst_folder, project, subject, time_session, task_folder)
                     _safe_copy(src, dst)
-
+                    _transfer_onsets(dst, task_path)
     return
 
+def _transfer_onsets(dst, task_path):
+    dst_folder = os.path.dirname(dst)
+    if glob(join(dst_folder, "*_Onsets.csv")):
+        return
+    onsets = glob(join(task_path, "*_Onsets.csv"))
+    for onset in onsets:
+        new_path = join(dst_folder, os.path.basename(onset))
+        _copy(onset, new_path)
+
 def _safe_copy(src, dst):
+    if os.path.isfile(dst + ".nii.gz"):
+        return
+    if os.path.isfile(dst + ".nii.tar.gz"):
+        return
     dst = _match_ext(dst, src)
     _copy(src, dst)
     _compress(dst)
-    _uncompress(dst)
 
 def _determine_dst(dst_folder, project, subject, time_session, folder, filename="normalized"):
     time    = time_session.replace("_data_archive", "")
@@ -109,13 +125,16 @@ def _remove(filepath):
 def _uncompress(compress_path):
     if not compress_path.endswith(".tar.gz"):
         return
-    uncompress_path = compress_path.replace(".tar.gz", ".gz")
+    dirname = os.path.dirname(compress_path)
+    uncompress_path = compress_path.replace(".tar.gz", "")
     _remove(uncompress_path)
-    with tarfile.open(compress_path, "r:gz") as f_in:
-        f_in.extractall()
-        with gzip.open(uncompress_path, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-    os.remove(compress_path)
+    command = ["tar -xvzf", compress_path, "-C", dirname]
+    subprocess.check_output(command)
+    output = glob(join(dirname, "*.nii"))
+    assert len(output) == 1, "expected one nifti for %s" % str(output)
+    os.rename(output, uncompress_path)
+    _compress(uncompress_path)
+
 
 def _compress(uncompress_path):
     if uncompress_path.endswith(".gz"):
@@ -146,15 +165,17 @@ def _parse_args(args):
         dst     = args.pop(-1)
         sources = args[:]
     else:
+        root    = "/Users/pbezuhov/Desktop/server/PANLab_Datasets"
         root    = "/Volumes/group/PANLab_Datasets"
         sources = [
                 ("connhc",  "CONNECTOME/conn_hc/dof-12"),
                 ("connmdd", "CONNECTOME/conn_mdd/dof-12"),
                 ("engage",  "ENGAGE"),
-                ("engage2", "ENGAGE_2"),
+        #        ("engage2", "ENGAGE_2"),
                 ("rad",     "RAD"),
                 ]
         sources = [(project, join(root, path)) for project, path in sources]
+        dst     = "/Users/pbezuhov/hd_4tb/raw"
         dst     = "/Volumes/hd_4tb/raw"
         print("No args provided using...\n\nsources: %s\ndst: %s\n" % (str(sources), dst))
 
