@@ -21,16 +21,26 @@ There are 4 classes that are helpful to abstract away a lot of details
 
 - Button.  Gathers all relevant button logs and can filter from there.
 - Cloud.   Pulls data from flywheel
-- Dicom.   This is helpful, so I don't need to remember pydicom details.  Also it will load all dicoms and gather relevant information by specifying a dicom directory
-- Model.   Helps load and save the model.  This is useful because this will run over several weeks maybe and I want to checkpoint progress
+- (unused) Dicom.   This is helpful, so I don't need to remember pydicom details.  Also it will load all dicoms and gather relevant information by specifying a dicom directory
+- (unused) Model.   Helps load and save the model.  This is useful because this will run over several weeks maybe and I want to checkpoint progress
 
 
 ### Todo
 
 - Get more comfortable with either tensorflow or pytorch
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
-- Decide if modeling on dicoms is better or if processed images would work
 - Collect all demographic information that should go in model
+- Filter out subjects by movement
+- Create a mask list (perhaps multiple options)
+  - I'm thinking panlabs mask list and a probability mask (z scores for amygdala for instance)
+- Search Flywheel or dicoms and gather all information on task
+  - slice order, operator, date, time, etc (get more than I plan to use)
+- Gather the movement for all tasks in the same CSV
+- Account for subjects that use average onsets
+
+### Done
+- Decide if modeling on dicoms is better or if processed images would work
+  - Nifti are better I think although ones that are not slice time corrected might be better.
 
 ### Notes
 - Feather does support float 16
