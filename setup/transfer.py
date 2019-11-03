@@ -63,7 +63,7 @@ def _safe_copy(src, dst):
     _copy(src, dst)
     _compress(dst)
 
-def _determine_dst(dst_folder, project, subject, time_session, folder, filename="normalized"):
+def _determine_dst(dst_folder, project, subject, time_session, folder, filename="warped"):
     time    = time_session.replace("_data_archive", "")
     subject = subject.lower().replace("_", "").replace("-", "")
     if folder in _task_map():
