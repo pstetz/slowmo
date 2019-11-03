@@ -31,6 +31,8 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Collect all demographic information that should go in model
 - Filter out subjects by movement
+- Transfer all warped images to hard drive
+- Normalize all warped images
 - Create a mask list (perhaps multiple options)
   - I'm thinking panlabs mask list and a probability mask (z scores for amygdala for instance)
 - Search Flywheel or dicoms and gather all information on task
