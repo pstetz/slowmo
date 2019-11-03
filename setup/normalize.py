@@ -61,7 +61,12 @@ def normalize_project(root, project, mask):
                     continue
                 if os.path.isfile(dst):
                     continue
-                _normalize(src, dst, mask)
+                try:
+                    _normalize(src, dst, mask)
+                except Exception as e:
+                    print(e)
+                    print("src", src)
+                    print("dst", dst)
 
 
 if __name__ == "__main__":
