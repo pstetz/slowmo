@@ -25,8 +25,8 @@ for time_session in $time_sessions ; do
                 cd $subject_path/$task
                 tar -xvzf $old_name
                 rm $old_name
-                mv wa01_normalized_func_data.nii normalized.nii
-                gzip normalized.nii
+                mv wa01_normalized_func_data.nii warped.nii
+                gzip warped.nii
             else
                 echo "Found no files for $time_session $subject $task"
             fi
