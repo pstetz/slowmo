@@ -171,7 +171,7 @@ def _parse_args(args):
                 ("connhc",  "CONNECTOME/conn_hc/dof-12"),
                 ("connmdd", "CONNECTOME/conn_mdd/dof-12"),
                 ("engage",  "ENGAGE"),
-        #        ("engage2", "ENGAGE_2"),
+                ("engage2", "ENGAGE_2"),
                 ("rad",     "RAD"),
                 ]
         sources = [(project, join(root, path)) for project, path in sources]
