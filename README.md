@@ -31,16 +31,16 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Collect all demographic information that should go in model
 - Filter out subjects by movement
-- Transfer all warped images to hard drive
 - Normalize all warped images
 - Create a mask list (perhaps multiple options)
   - I'm thinking panlabs mask list and a probability mask (z scores for amygdala for instance)
 - Search Flywheel or dicoms and gather all information on task
   - slice order, operator, date, time, etc (get more than I plan to use)
-- Gather the movement for all tasks in the same CSV
 - Account for subjects that use average onsets
 
 ### Done
+- Transfer all warped images to hard drive
+- Gather the movement for all tasks in the same CSV
 - Decide if modeling on dicoms is better or if processed images would work
   - Nifti are better I think although ones that are not slice time corrected might be better.
 
