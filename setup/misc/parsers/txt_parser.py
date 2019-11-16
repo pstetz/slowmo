@@ -93,7 +93,7 @@ def make_ons_gonogo(df):
     return make_ons(df, cat_index)
 
 
-def generate_onsets(logpath, outdir, task):
+def txt_parser(logpath, outdir, task):
     if task == "wm":
         df = grabEvents(fileName,  13, 2.75)
         df = make_ons_wm(df)
