@@ -7,70 +7,6 @@ import os
 import numpy as np
 
 
-def _determine_onset(trial, stimuli):
-    ### Find start and duration
-    stimulus = [
-            line for line in trial if (
-                "stimulus" in line.data and
-                 line.data["stimulus"] in stimuli
-            )
-    ]
-    start, end = _find_start_end(stimulus)
-    row = dict()
-    row["ons"], row["dur"] = start.time, end.time - start.time
-
-    ### Find stimulus
-    start = [line for line in trial if line.type == "New trial"]
-    assert len(start) == 1, "Expected exactly 1 start"
-    start = start[0]
-
-    # Append relevant info for both criteria
-    row["stimulus"] = start.data["trial"]["stimulus"]
-    row["category"] = start.data["trial"]["category"]
-    return row
-
-def _wm_criteria_2(orig_df):
-    """
-    Look at the assigned category instead
-    """
-    prev = orig_df.stimulus
-    curr = np.roll(prev, 1)
-
-    df = orig_df.copy()
-    df.loc[prev == curr, "category"] = "Target"
-    df.loc[np.logical_and(prev != curr, df.category != "Baseline"), "category"] = "NonTarget"
-    return df
-
-
-def generate_onsets(trials, output_dir, filename, new_criteria):
-    """
-    There are two different ways of parsing the WM task.
-    One with the intended instructions and one with the actual instructions
-    """
-    onsets = list()
-    for trial in trials:
-        onsets.append( _determine_onset(trial, stimuli=["wm_image", "image_2"]) )
-    df = pd.DataFrame( onsets )
-
-    ### FIXME: use a better naming!  New is the instructions and Old is the intended instructions
-    if new_criteria:
-        df = _wm_criteria_2(df)
-    return df
-
-def save_plip_ons_format(df, output_dir):
-    for cat in df["category"].unique():
-        name = cat
-        tmp = df[df["category"] == cat]
-        output_path = join(output_dir, "%s_Onsets.csv" % name)
-        tmp = tmp[["ons"]]
-        tmp.to_csv(output_path, index=False)
-
-
-
-"""
-WM end
-"""
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -223,28 +159,27 @@ def _find_start_end(lines):
             ], key=lambda x: x.time)
     return start, end
 
+def _determine_onset(trial, stimuli):
+    ### Find start and duration
+    stimulus = [
+            line for line in trial if (
+                "stimulus" in line.data and
+                 line.data["stimulus"] in stimuli
+            )
+    ]
+    start, end = _find_start_end(stimulus)
+    row = dict()
+    row["ons"], row["dur"] = start.time, end.time - start.time
 
-def _determine_onset(trial, is_consumption=True):
-    stimulus = {True: "cross_3", False: "cross_1"}[is_consumption]
-    cross_lines = [line for line in trial if "stimulus" in line.data and line.data["stimulus"] == stimulus]
-
-    start, end = _find_start_end(cross_lines)
-    ons, dur = start.time, end.time - start.time
-
-    ### Find start
+    ### Find stimulus
     start = [line for line in trial if line.type == "New trial"]
     assert len(start) == 1, "Expected exactly 1 start"
-    # outcome_map = {
-    #         "-$0.00": "lose_0", "+$0.00": "win_0",
-    #         "-$5.00": "lose_5", "+$5.00": "win_5"
-    # }
-    outcome_map = {
-            "images/sqr.bmp": "lose_0", "images/cir.bmp": "win_0",
-            "images/sqr3.bmp": "lose_5", "images/cir3.bmp": "win_5"
-    }
-    result = outcome_map[start[0].data["trial"]["stimulus"]]
+    start = start[0]
 
-    return ons, dur, result
+    # Append relevant info for both criteria
+    row["stimulus"] = start.data["trial"]["stimulus"]
+    row["category"] = start.data["trial"]["category"]
+    return row
 
 def find_time_zero(parsed, delay=):
     """ 6s for singleband scans.  8.52s delay for multiband scans. """
@@ -252,38 +187,20 @@ def find_time_zero(parsed, delay=):
     assert len(line) == 1, "Should find exactly one trigger sent"
     return line[0].time + 8.52 # serial communication and dummy scans
 
-def generate_onsets(trials, output_dir, filename):
-    """
-    Main function that generates the onsets for the MID/SID given a button logfile.
+def generate_onsets():
+    generate_onsets_mid()
+    generate_onsets_wm()
 
-    As Christina explains here:
-    "so for the MID, there are (1) Win $5 anticipation, (2) Win $0 anticipation, (3) Lose $5 anticipation,
-    (4) Lose $0 anticipation, (5) Win $5 consumption, (6) Win $0 consumption, (7) Lose $5 consumption, and
-    (8) Lose $0 consumption.  where the anticipation phase is the onset and duration of cross 1 and
-    the consumption phase is the onset and duration of cross 3"
-    """
+
+def generate_onsets_wm(trials, output_dir, filename):
+    """ FIXME: add new_criteria """
     onsets = list()
     for trial in trials:
-        con_ons, con_dur, con_result = _determine_onset(trial, is_consumption=True)
-        ant_ons, ant_dur, ant_result = _determine_onset(trial, is_consumption=False)
-        onsets.append({"ons": con_ons, "dur": con_dur, "type": "%s_consumption" % con_result})
-        onsets.append({"ons": ant_ons, "dur": ant_dur, "type": "%s_anticipation" % ant_result})
-    return pd.DataFrame(onsets)
+        onsets.append( _determine_onset(trial, stimuli=["wm_image", "image_2"]) )
+    return pd.DataFrame( onsets )
 
 
-
-"""
-Original parser
-"""
 def generate_onsets(orig_df, task_number, output_dir):
-    if task_number == 26:
-        # This version of working memory is multiplex
-        DUMMY_SCAN_SECONDS = 8.52
-    else:
-        # We have 3 dummy scans with TR=2s, so our dummy scan in seconds in 6s
-        DUMMY_SCAN_SECONDS = 6
-    stim_order = task_to_stim_order[task_number]
-
     # We look for the start of the task, which depends on the task type as some have training stimuli
     rep_starts, = np.where((orig_df['rep'] == 0) & (orig_df['index'] == 0))
     if task_number == 1:
@@ -292,10 +209,6 @@ def generate_onsets(orig_df, task_number, output_dir):
     else:
         assert len(rep_starts) == 1, 'We expect one rep=0, index=0 trials for most tasks.'
         start_index = rep_starts[0]
-
-    # After s is pressed, we start the scanner, which takes ~0.5s because we sleep 0.5s when waiting for a connection.
-    # HACK when possible, this should prefer our official "scan start" event
-    scan_start = orig_df['key.s.time'][start_index - 1] + 0.5
 
     # We have training for some tasks and some header events for others. This line removes training and ensures we
     # start at the first stimulus. We copy to avoid issues with setting properties on views of a df.
@@ -324,21 +237,6 @@ def generate_onsets(orig_df, task_number, output_dir):
     # We pull in category from the stimulus order CSV
     df['category'] = stim_order.category.values
 
-    # We warn when the actual offset seems like it might be wrong.
-    if task_number == 1:
-        expected_offset = 1.5
-    elif task_number == 4:
-        expected_offset = 4
-    elif task_number == 26:
-        expected_offset = 1.48
-    elif task_number in (3, 5):
-        expected_offset = 2
-    actual_offset = df.iloc[0]['ons']
-    if abs(actual_offset - expected_offset) > 0.025:
-        print(
-            'Warning: First stimulus offset from beginning of non-dummy scan data should '
-            'have been {} but was {}'.format(expected_offset, actual_offset))
-
     # We appropriately offset our df here so that we can simply write all remaining events
     if task_number in (3, 5):
         # Out of a spirit of neuroticism, we ensure that our block design aligns correctly with our expectations
@@ -350,16 +248,6 @@ def generate_onsets(orig_df, task_number, output_dir):
                 assert row.category == checking_category, 'Expected to find category {} but found {}'.format(
                     checking_category, row.category)
 
-        # Since blocks are every 8, we simply take the first of the block for its offset and category
-        df = df.iloc[::8]
-
-    # We write them to a file based on name of category.
-    for category, group in df.groupby('category'):
-        if category is None:
-            continue
-        result = group[['num', 'ons']].copy()
-        result['num'] = result['num'].astype(np.int)
-        result.to_csv(os.path.join(output_dir, '{}_Onsets.csv'.format(category)), index=False)
 
 if __name__ == '__main__':
     ### Gather args
@@ -388,13 +276,4 @@ if __name__ == '__main__':
     time_0 = find_time_zero(parsed)
     df["ons"] = df["ons"] - time_0
     df.sort_values("ons", inplace = True)
-    save_plip_ons_format(df, output_dir)
-
-if __name__ == '__main__':
-    df.to_csv("onsets.csv", index=False)
-
-if __name__ == '__main__':
-    df = convert_to_timing_file(filename)
-
-    generate_onsets(df, task_num, output_dir)
 
