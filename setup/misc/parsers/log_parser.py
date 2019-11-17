@@ -181,11 +181,11 @@ def _determine_onset(trial, stimuli):
     row["category"] = start.data["trial"]["category"]
     return row
 
-def find_time_zero(parsed, delay=):
+def find_time_zero(parsed, delay=6):
     """ 6s for singleband scans.  8.52s delay for multiband scans. """
     line = [line for line in parsed if line.type == "Trigger Sent"]
     assert len(line) == 1, "Should find exactly one trigger sent"
-    return line[0].time + 8.52 # serial communication and dummy scans
+    return line[0].time + delay
 
 def generate_onsets():
     generate_onsets_mid()
@@ -247,6 +247,9 @@ def generate_onsets(orig_df, task_number, output_dir):
             else:
                 assert row.category == checking_category, 'Expected to find category {} but found {}'.format(
                     checking_category, row.category)
+
+def log_parser(log, dst_path, task):
+    pass
 
 
 if __name__ == '__main__':
