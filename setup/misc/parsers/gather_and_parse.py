@@ -35,8 +35,7 @@ def determine_subject_num(subject, task_path):
             break
     if not subject_num:
         raise Exception("Cannot determine subject num from %s in %s" % (subject, task_path))
-    print(subject_num)
-    subject_num = "%8d" % int(subject_num)
+    subject_num = "%08d" % int(subject_num)
     return subject_num
 
 def _find_txt(task_path, subject, task):
@@ -48,8 +47,10 @@ def _find_txt(task_path, subject, task):
             "workingmemSB": "WorkingMemory",
             "emoconflict": "EmotionalStroopTask",
     }
+    if task not in legacy_task_map:
+        return False
     legacy_task = legacy_task_map[task]
-    txt_file = glob(join(task_path, "%s*%s*.txt" % subject_num, legacy_task))
+    txt_file = glob(join(task_path, "%s*%s*.txt" % (subject_num, legacy_task)))
     return _safe_log_pop(txt_file, task_path, ".txt")
 
 def _safe_log_pop(log_results, task_path, ext):
@@ -67,6 +68,8 @@ def _find_log(task_path, subject, task):
             "nonconscious": "Faces Nonconscious",
             "workingmemMB": "WorkingMemMultiband",
     }
+    if task not in current_task_map:
+        return False
     current_task = current_task_map[task]
     log_file = glob(join(task_path, "%s*%s*.log" % (subject.upper(), current_task)))
     return _safe_log_pop(log_file, task_path, ".log")
@@ -98,7 +101,7 @@ def gather_and_parse(input_, output_):
             time_session = os.path.basename(time_path)
             for plip_task in _task_map().keys():
                 task = _task_map()[plip_task]
-                task_path = join(subject_path, "100_fMRI", plip_task)
+                task_path = join(time_path, "100_fMRI", plip_task)
                 if not os.path.isdir(task_path):
                     continue
                 dst_path = _dst_path(output_, time_session, subject, task)
