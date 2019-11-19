@@ -187,12 +187,22 @@ def find_time_zero(parsed, delay=6):
     assert len(line) == 1, "Should find exactly one trigger sent"
     return line[0].time + delay
 
-def generate_onsets():
-    generate_onsets_mid()
-    generate_onsets_wm()
+def generate_onsets(trials, task):
+    if task == 1:
+        generate_onsets_gonogo(trials)
+    elif task in [3, 5]:
+        generate_onsets_faces(trials)
+    elif task == 26:
+        generate_onsets_wm(trials)
 
+def generate_onsets_gonogo(trials):
+    print(trials)
+    pass
 
-def generate_onsets_wm(trials, output_dir, filename):
+def generate_onsets_faces(trials):
+    pass
+
+def generate_onsets_wm(trials):
     """ FIXME: add new_criteria """
     onsets = list()
     for trial in trials:
@@ -200,7 +210,34 @@ def generate_onsets_wm(trials, output_dir, filename):
     return pd.DataFrame( onsets )
 
 
-def generate_onsets(orig_df, task_number, output_dir):
+def log_parser(log_filepath, dst_path, task):
+    parsed = _parse(log_filepath)
+    parsed = _ensure_distinct_trials(parsed)
+    trials = _seperate_by_trial(parsed)
+
+    df = generate_onsets(trials, task)
+    time_0 = find_time_zero(parsed)
+    df["ons"] = df["ons"] - time_0
+    df.sort_values("ons", inplace = True)
+    df.to_csv(dst_path)
+
+
+if __name__ == '__main__':
+    ### Gather args
+    import argparse
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('filename', help='The path to the log file.', type=str)
+    arg_parser.add_argument('outdir', help='The path to the output directory.', type=str)
+    arg_parser.add_argument('--task_number', help='The task number for the log.', type=int)
+
+    ### Parse args
+    args = arg_parser.parse_args()
+    filename = args.filename
+    output_dir = args.outdir
+    task_num = args.task_number
+
+
+def generate_onsets_old(orig_df, task_number, output_dir):
     # We look for the start of the task, which depends on the task type as some have training stimuli
     rep_starts, = np.where((orig_df['rep'] == 0) & (orig_df['index'] == 0))
     if task_number == 1:
@@ -247,36 +284,3 @@ def generate_onsets(orig_df, task_number, output_dir):
             else:
                 assert row.category == checking_category, 'Expected to find category {} but found {}'.format(
                     checking_category, row.category)
-
-def log_parser(log, dst_path, task):
-    pass
-
-
-if __name__ == '__main__':
-    ### Gather args
-    import argparse
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('filename', help='The path to the log file.', type=str)
-    arg_parser.add_argument('outdir', help='The path to the output directory.', type=str)
-    arg_parser.add_argument('--task_number', help='The task number for the log.', type=int)
-
-    ### Parse args
-    args = arg_parser.parse_args()
-    filename = args.filename
-    output_dir = args.outdir
-    task_num = args.task_number
-
-    if task_number == 25:
-        use_criteria_2 = True
-    else:
-        use_criteria_2 = False
-
-    parsed = _parse(filename)
-    parsed = _ensure_distinct_trials(parsed)
-    trials = _seperate_by_trial(parsed)
-
-    df = generate_onsets(trials, output_dir, filename, new_criteria)
-    time_0 = find_time_zero(parsed)
-    df["ons"] = df["ons"] - time_0
-    df.sort_values("ons", inplace = True)
-
