@@ -43,6 +43,7 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Account for subjects that use average onsets
 - Search Flywheel or dicoms and gather all information on task
   - slice order, operator, date, time, etc (get more than I plan to use)
+- Add button press to the onset times
 
 
 ### Notes

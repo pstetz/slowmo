@@ -93,7 +93,6 @@ def txt_parser(logpath, output_path, task):
     if task == "workingmemSB":
         df = grabEvents(logpath,  13, 2.75)
         df = make_ons_wm(df)
-        print(df)
     elif task in ["conscious", "nonconscious"]:
         df = grabEvents(logpath,  1, 2)
         df = make_ons_faces(df)
