@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm
 from glob import glob
 from os.path import join
 from log_parser import log_parser
@@ -81,13 +82,11 @@ def create_onsets(task_path, subject, task, dst_path):
         msg = "Found two possible log files for %s" % task_path
         raise Exception(msg)
     elif txt:
-        pass
-        #txt_parser(txt, dst_path, task)
+        txt_parser(txt, dst_path, task)
     elif log:
-        pass
-        #log_parser(log, dst_path, task)
+        log_parser(log, dst_path, task)
     else:
-        print("No log files found for %s" % task_path)
+        return
 
 def _dst_path(output_, time_session, subject, task):
     session = time_session.replace("_data_archive", "")
@@ -95,7 +94,7 @@ def _dst_path(output_, time_session, subject, task):
     return join(output_, session, subject, task, "onsets.csv")
 
 def gather_and_parse(input_, output_):
-    for subject_path in glob(join(input_, "*")):
+    for subject_path in tqdm(glob(join(input_, "*"))):
         subject = os.path.basename(subject_path)
         for time_path in glob(join(subject_path, "*")):
             time_session = os.path.basename(time_path)
@@ -106,9 +105,15 @@ def gather_and_parse(input_, output_):
                     continue
                 dst_path = _dst_path(output_, time_session, subject, task)
                 if os.path.isfile(dst_path):
-                    print("Onsets already created for %s" % task_path)
+                    # print("Onsets already created for %s" % task_path)
                     continue
-                create_onsets(task_path, subject, task, dst_path)
+                dst_folder = os.path.dirname(dst_path)
+                if not os.path.isdir(dst_folder):
+                    os.makedirs(dst_folder)
+                try:
+                    create_onsets(task_path, subject, task, dst_path)
+                except:
+                    print(task_path)
 
 if __name__ == "__main__":
     root = "/Volumes/group/PANLab_Datasets"
