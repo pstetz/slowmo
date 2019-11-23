@@ -1,10 +1,8 @@
-from __future__ import print_function
-import pandas as pd
-import ast
-import re
-from collections import namedtuple, OrderedDict
 import os
-import numpy as np
+import re
+import ast
+import pandas as pd
+from collections import namedtuple, OrderedDict
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -87,7 +85,8 @@ def _parse(filename):
             elif msg_type == 'Keypress':
                 data = OrderedDict(key=msg_content)
 
-        parsed.append(LogLine(type=msg_type, time=time, category=category, data=data, orig_msg=msg))
+        if msg != "window1: blendMode = 'avg'":
+            parsed.append(LogLine(type=msg_type, time=time, category=category, data=data, orig_msg=msg))
 
     return parsed
 
@@ -189,22 +188,46 @@ def find_time_zero(parsed, delay=6):
 
 def generate_onsets(trials, task):
     if task == 1:
-        generate_onsets_gonogo(trials)
+        return generate_onsets_gonogo(trials)
     elif task in [3, 5]:
-        generate_onsets_faces(trials)
+        return generate_onsets_faces(trials)
     elif task == 26:
-        generate_onsets_wm(trials)
+        return generate_onsets_wm(trials)
+    raise Exception("No log parser for task_num %d" % task)
+
+def _button_presses(trials):
+    presses = list()
+    for trial in trials:
+        for line in trial:
+            if line.type != "Keypress":
+                continue
+            if line.data["key"] in ["5", "s"]:
+                continue
+            else:
+                presses.append({"ons": line.time, "stimulus": line.data["key"], "category": "keypress"})
+    return presses
 
 def generate_onsets_gonogo(trials):
-    print(trials)
-    pass
+    for i in range(len(trials)):
+        _curr = trials[i][0]
+        _next = trials[i+1][0]
+        if _curr.data["index"] > _next.data["index"]:
+            trials = trials[i+1:]
+            break
+    onsets = _button_presses(trials)
+    for trial in trials:
+        onsets.append( _determine_onset(trial, stimuli=["gng_image"]) )
+    return pd.DataFrame( onsets )
 
 def generate_onsets_faces(trials):
-    pass
+    onsets = _button_presses(trials)
+    for trial in trials:
+        onsets.append( _determine_onset(trial, stimuli=["emotion_image", "noncon_image"]) )
+    return pd.DataFrame( onsets )
 
 def generate_onsets_wm(trials):
     """ FIXME: add new_criteria """
-    onsets = list()
+    onsets = _button_presses(trials)
     for trial in trials:
         onsets.append( _determine_onset(trial, stimuli=["wm_image", "image_2"]) )
     return pd.DataFrame( onsets )
@@ -226,61 +249,14 @@ if __name__ == '__main__':
     ### Gather args
     import argparse
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('filename', help='The path to the log file.', type=str)
-    arg_parser.add_argument('outdir', help='The path to the output directory.', type=str)
-    arg_parser.add_argument('--task_number', help='The task number for the log.', type=int)
+    arg_parser.add_argument('filepath', help='The path to the log file.', type=str)
+    arg_parser.add_argument('dst', help='The path to the output directory.', type=str)
+    arg_parser.add_argument('task_num', help='The task number for the log.', type=int)
 
     ### Parse args
     args = arg_parser.parse_args()
-    filename = args.filename
-    output_dir = args.outdir
-    task_num = args.task_number
+    log_filepath = args.filepath
+    dst_path = args.dst
+    task_num = args.task_num
+    log_parser(log_filepath, dst_path, task_num)
 
-
-def generate_onsets_old(orig_df, task_number, output_dir):
-    # We look for the start of the task, which depends on the task type as some have training stimuli
-    rep_starts, = np.where((orig_df['rep'] == 0) & (orig_df['index'] == 0))
-    if task_number == 1:
-        assert len(rep_starts) == 2, 'We expect two rep=0, index=0 trials for GNG, but found {}: {}'.format(len(rep_starts), rep_starts)
-        start_index = rep_starts[1]
-    else:
-        assert len(rep_starts) == 1, 'We expect one rep=0, index=0 trials for most tasks.'
-        start_index = rep_starts[0]
-
-    # We have training for some tasks and some header events for others. This line removes training and ensures we
-    # start at the first stimulus. We copy to avoid issues with setting properties on views of a df.
-    df = orig_df.iloc[start_index:].copy()
-
-    # Then we compute .ons column
-    if task_number == 1:
-        stim_key = 'stimulus.gng_image.on'
-        stim_order_key = 'stimulus'
-    elif task_number == 3:
-        stim_key = 'stimulus.emotion_image.on'
-        stim_order_key = 'emotion'
-    elif task_number in (4, 26):
-        stim_key = 'stimulus.wm_image.on'
-        stim_order_key = 'stimulus'
-    elif task_number == 5:
-        stim_key = 'stimulus.noncon_image.on'
-        stim_order_key = 'noncon'
-
-    # For fMRI analysis, we are interested in the offset of a stimulus relative to the first
-    # non-dummy TR of our fMRI scan. Since we discard 3 dummy scans with a TR of 2 seconds,
-    # we should offset our scan start timing by 6 seconds and compute our simulus relative
-    # to this offset scan start.
-    df['ons'] = df[stim_key] - scan_start - DUMMY_SCAN_SECONDS
-    df['num'] = df['index'] + 1
-    # We pull in category from the stimulus order CSV
-    df['category'] = stim_order.category.values
-
-    # We appropriately offset our df here so that we can simply write all remaining events
-    if task_number in (3, 5):
-        # Out of a spirit of neuroticism, we ensure that our block design aligns correctly with our expectations
-        checking_category = None
-        for _, row in df.iterrows():
-            if row['index'] % 8 == 0:
-                checking_category = row.category
-            else:
-                assert row.category == checking_category, 'Expected to find category {} but found {}'.format(
-                    checking_category, row.category)
