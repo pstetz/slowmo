@@ -182,18 +182,18 @@ def _determine_onset(trial, stimuli):
 
 def find_time_zero(parsed, delay=6):
     """ 6s for singleband scans.  8.52s delay for multiband scans. """
-    line = [line for line in parsed if line.type == "Trigger Sent"]
+    line = [line for line in parsed if line.type and line.type.startswith("Trigger Sent")]
     assert len(line) == 1, "Should find exactly one trigger sent"
     return line[0].time + delay
 
 def generate_onsets(trials, task):
-    if task == 1:
+    if task == "gonogo":
         return generate_onsets_gonogo(trials)
-    elif task in [3, 5]:
+    elif task in ["conscious", "nonconscious"]:
         return generate_onsets_faces(trials)
-    elif task == 26:
+    elif task == "workingmemMB":
         return generate_onsets_wm(trials)
-    raise Exception("No log parser for task_num %d" % task)
+    raise Exception("No log parser for task %s" % task)
 
 def _button_presses(trials):
     presses = list()
@@ -201,19 +201,13 @@ def _button_presses(trials):
         for line in trial:
             if line.type != "Keypress":
                 continue
-            if line.data["key"] in ["5", "s"]:
+            if line.data["key"] in ["5", "s", "equal"]:
                 continue
             else:
                 presses.append({"ons": line.time, "stimulus": line.data["key"], "category": "keypress"})
     return presses
 
 def generate_onsets_gonogo(trials):
-    for i in range(len(trials)):
-        _curr = trials[i][0]
-        _next = trials[i+1][0]
-        if _curr.data["index"] > _next.data["index"]:
-            trials = trials[i+1:]
-            break
     onsets = _button_presses(trials)
     for trial in trials:
         onsets.append( _determine_onset(trial, stimuli=["gng_image"]) )
@@ -251,12 +245,12 @@ if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('filepath', help='The path to the log file.', type=str)
     arg_parser.add_argument('dst', help='The path to the output directory.', type=str)
-    arg_parser.add_argument('task_num', help='The task number for the log.', type=int)
+    arg_parser.add_argument('task', help='The task name for the log.', type=str)
 
     ### Parse args
     args = arg_parser.parse_args()
     log_filepath = args.filepath
     dst_path = args.dst
-    task_num = args.task_num
-    log_parser(log_filepath, dst_path, task_num)
+    task = args.task
+    log_parser(log_filepath, dst_path, task)
 
