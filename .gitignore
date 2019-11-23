@@ -4,3 +4,4 @@ data
 __pycache__
 dev
 *.h5
+*.pyc
