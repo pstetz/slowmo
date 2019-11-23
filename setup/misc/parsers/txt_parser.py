@@ -1,13 +1,9 @@
-import pandas as pd
-import numpy as np
-import string
-import sys
 import os
 import re
 import datetime
-import glob
-import shutil
-import math
+import numpy as np
+import pandas as pd
+from os.path import join
 
 def grabEvents(filepath, eventStart=1, lag=0):
     file_handle = open(filepath, "r")
@@ -42,12 +38,12 @@ def make_ons_motor(df):
 
 
 def make_ons(df, cat_index):
-    dfs = make_ons_motor(df, outDir)
+    dfs = make_ons_motor(df)
     for cat, index in cat_index:
         tmp_df = df[(df['num'].isin(index)) &  (df['type']=='Paradigm Event')]
         tmp_df["category"] = cat
         dfs.append( tmp_df )
-    return pd.concat(dfs)
+    return pd.concat(dfs, sort=False)
 
 
 def make_ons_faces(df):
@@ -93,26 +89,29 @@ def make_ons_gonogo(df):
     return make_ons(df, cat_index)
 
 
-def txt_parser(logpath, outdir, task):
-    if task == "wm":
-        df = grabEvents(fileName,  13, 2.75)
+def txt_parser(logpath, output_path, task):
+    if task == "workingmemSB":
+        df = grabEvents(logpath,  13, 2.75)
         df = make_ons_wm(df)
-    elif task == "faces":
-        df = grabEvents(fileName,  1, 2)
+        print(df)
+    elif task in ["conscious", "nonconscious"]:
+        df = grabEvents(logpath,  1, 2)
         df = make_ons_faces(df)
     elif task == "gonogo":
-        df = grabEvents(fileName,  9, 1.5)
+        df = grabEvents(logpath,  9, 1.5)
         make_ons_gonogo(df)
+    else:
+        raise Exception("Task %s not known for txt parser" % task)
 
-    output_path = join(outdir, "onsets.csv")
-    print('Saving onsets to %s/' % output_path)
+    df.sort_values("ons", inplace=True)
     df.to_csv(output_path, index=False)
 
 
 if __name__ == "__main__":
     import sys
-    args = argv[1:]
+    args = sys.argv[1:]
     logpath = args[0]
     outdir  = args[1]
     task    = args[2]
+    txt_parser(logpath, outdir, task)
 
