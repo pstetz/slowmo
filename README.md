@@ -29,7 +29,6 @@ There are 4 classes that are helpful to abstract away a lot of details
 
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Collect all demographic information that should go in model
-- Filter out subjects by movement
 - Create a mask list (perhaps multiple options)
   - I'm thinking panlabs mask list and a probability mask (z scores for amygdala for instance)
 
@@ -44,6 +43,7 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Search Flywheel or dicoms and gather all information on task
   - slice order, operator, date, time, etc (get more than I plan to use)
 - Add button press to the onset times
+- Filter out subjects by movement
 
 
 ### Notes
