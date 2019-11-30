@@ -42,17 +42,7 @@ def transfer(project, src_folder, dst_folder):
                 if src:
                     dst = _determine_dst(dst_folder, project, subject, time_session, task_folder)
                     _safe_copy(src, dst)
-                    _transfer_onsets(dst, task_path)
     return
-
-def _transfer_onsets(dst, task_path):
-    dst_folder = os.path.dirname(dst)
-    if glob(join(dst_folder, "*_Onsets.csv")):
-        return
-    onsets = glob(join(task_path, "*_Onsets.csv"))
-    for onset in onsets:
-        new_path = join(dst_folder, os.path.basename(onset))
-        _copy(onset, new_path)
 
 def _safe_copy(src, dst):
     if os.path.isfile(dst + ".nii.gz"):
