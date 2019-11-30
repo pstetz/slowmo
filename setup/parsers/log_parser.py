@@ -201,7 +201,7 @@ def _button_presses(trials):
         for line in trial:
             if line.type != "Keypress":
                 continue
-            if line.data["key"] in ["5", "s", "equal"]:
+            if line.data["key"] in ["5", "s", "equal", "escape"]:
                 continue
             else:
                 presses.append({"ons": line.time, "stimulus": line.data["key"], "category": "keypress"})
@@ -236,7 +236,7 @@ def log_parser(log_filepath, dst_path, task):
     time_0 = find_time_zero(parsed)
     df["ons"] = df["ons"] - time_0
     df.sort_values("ons", inplace = True)
-    df.to_csv(dst_path)
+    df.to_csv(dst_path, index=False)
 
 
 if __name__ == '__main__':
