@@ -29,8 +29,6 @@ There are 4 classes that are helpful to abstract away a lot of details
 
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Collect all demographic information that should go in model
-- Replace `grey_matter .* fmri` with a 4D convolution when that becomes available 
-- Start training
 
 
 ### Done
@@ -47,6 +45,9 @@ There are 4 classes that are helpful to abstract away a lot of details
 - Create a mask list (perhaps multiple options)
   - I'm thinking panlabs mask list and a probability mask (z scores for amygdala for instance)
   - Neurosynth is fairly dump and provides huge unrealistic regions.  The PLIP mask list might be best
+- Replace `grey_matter .* fmri` with a 4D convolution when that becomes available 
+  - Kind of available, I guess keras treats `(fmri, grey)` as 3D
+- Start training
 
 
 ### Notes
