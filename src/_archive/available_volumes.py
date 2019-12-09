@@ -7,7 +7,7 @@ def _mni_brain(filepath="/Volumes/hd_4tb/masks/mni/MNI152_T1_2mm_brain_mask.nii.
     data  = image.get_data()
     return data
 
-def create_available_volumes(r=2, output_path="/Users/pbezuhov/git/MRI-SlowMo/src/available_volumes.npy"):
+def create_available_volumes(r=4, output_path="/Users/pbezuhov/git/MRI-SlowMo/src/available_volumes.npy"):
     data = _mni_brain()
     shape = data.shape
     available_volumes = list()
