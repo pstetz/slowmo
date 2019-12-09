@@ -32,7 +32,8 @@ def make_ons_motor(df):
     dfs = list()
     for cat, num in [("left", 1), ("right", 6)]:
         tmp_df = df[(df['type']=='Button Press Event') & (df['num']==num)][['num',  'ons']]
-        tmp_df["category"] = cat
+        tmp_df["category"] = "keypress"
+        tmp_df["stimulus"] = num
         dfs.append(tmp_df)
     return dfs
 
@@ -55,12 +56,12 @@ def make_ons_faces(df):
     disgust = [41, 42, 43, 44, 45, 46, 47, 48, 57, 58, 59, 60, 61, 62, 63, 64, 105, 106, 107, 108, 109, 110, 111, 112, 145, 146, 147, 148, 149, 150, 151, 152, 233, 234, 235, 236, 237, 238, 239, 240]
 
     cat_index = [
-            ("neutral", neutral),
-            ("happy", happy),
-            ("fear", fear),
-            ("anger", anger),
-            ("sad", sad),
-            ("disgust", disgust),
+            ("Neutral", neutral),
+            ("Happy", happy),
+            ("Fear", fear),
+            ("Anger", anger),
+            ("Sad", sad),
+            ("Disgust", disgust),
     ]
     return make_ons(df, cat_index)
 
@@ -71,9 +72,9 @@ def make_ons_wm(df):
     target = [15, 22, 24, 30, 36, 41, 43, 44, 46, 49, 51, 61, 64, 73, 75, 85, 86, 93, 103, 104, 106, 110, 115, 119, 120, 123, 124, 127, 130, 131]
 
     cat_index = [
-            ("baseline", baseline),
-            ("nontarget", nontarget),
-            ("target", target)
+            ("Baseline", baseline),
+            ("NonTarget", nontarget),
+            ("Target", target)
     ]
     return make_ons(df, cat_index)
 
@@ -83,8 +84,8 @@ def make_ons_gonogo(df):
     go = [9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 23, 24, 25, 26, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 45, 46, 47, 48, 49, 50, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 79, 80, 81, 82, 85, 86, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 105, 106, 107, 108, 111, 112, 113, 114, 115, 116, 119, 120, 121, 122, 123, 124, 125, 126, 129, 130, 131, 132, 133, 134, 135, 136, 139, 140, 141, 142, 143, 144, 147, 148, 151, 152, 153, 154, 155, 156, 157, 158, 161, 162, 163, 164, 165, 166, 169, 170, 171, 172, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 193, 194, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 209, 210, 213, 214, 215, 216, 219, 220, 221, 222, 223, 224, 227, 228, 229, 230, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 245, 246]
 
     cat_index = [
-            ("go", go),
-            ("nogo", nogo),
+            ("Go", go),
+            ("NoGo", nogo),
     ]
     return make_ons(df, cat_index)
 
@@ -98,10 +99,11 @@ def txt_parser(logpath, output_path, task):
         df = make_ons_faces(df)
     elif task == "gonogo":
         df = grabEvents(logpath,  9, 1.5)
-        make_ons_gonogo(df)
+        df = make_ons_gonogo(df)
     else:
         raise Exception("Task %s not known for txt parser" % task)
 
+    df.drop(["time", "type", "num"], axis=1, inplace=True)
     df.sort_values("ons", inplace=True)
     df.to_csv(output_path, index=False)
 
