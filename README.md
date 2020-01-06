@@ -29,6 +29,8 @@ There are 4 classes that are helpful to abstract away a lot of details
 
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Collect all demographic information that should go in model
+- Normalize the model inputs
+- Fix the onsets for the keypresses
 
 
 ### Done
