@@ -1,3 +1,7 @@
+"""
+These are helper functions that ended up not being needed
+"""
+
 def main(masks_dir, masks_path):
     with open(masks_path) as f:
         mask_names = f.readlines()
