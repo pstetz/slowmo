@@ -109,9 +109,10 @@ def _stim_time(df, stimuli, curr_time):
     return _onset_time(stim, curr_time)
 
 def _keypress_times(df, button, curr_time):
+    df.fillna(0, inplace=True)
     keys = df[(
         (df["category"] == "keypress") &
-        (df["stimulus"] == button)
+        (df["stimulus"].astype(int) == int(button))
     )]
     return _onset_time(keys, curr_time)
 
@@ -132,7 +133,8 @@ def last_onset(onset_df, task, curr_time, max_time=1000):
         _time = _stim_time(onset_df, stimuli, curr_time)
         if _time:
             onset_timing[stimuli] = _time
-    return pd.DataFrame(onset_timing, index=[1])
+    df = pd.DataFrame(onset_timing, index=[1])
+    return df
 
 
 """
