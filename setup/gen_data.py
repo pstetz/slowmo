@@ -9,7 +9,7 @@ import nibabel as nib
 
 from glob import glob
 from tqdm import tqdm
-from os.path import join
+from os.path import isdir, isfile, join
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -65,9 +65,12 @@ def _load_volume(fmri, x, y, z, t):
 def _load(filepath):
     return nib.as_closest_canonical(nib.load(filepath))
 
-def _get_data(filepath):
+def _get_data(filepath, is_fmri=False):
     image = _load(filepath)
-    return image.get_data()
+    data  = image.get_data()
+    if is_fmri:
+        data  = data[:, :, :, :151]
+    return data
 
 def _time_map(session):
     _map = {
@@ -110,9 +113,10 @@ def _stim_time(df, stimuli, curr_time):
 
 def _keypress_times(df, button, curr_time):
     df.fillna(0, inplace=True)
+    key_stim = pd.to_numeric(df["stimulus"], errors="coerce").fillna(0)
     keys = df[(
         (df["category"] == "keypress") &
-        (df["stimulus"].astype(int) == int(button))
+        (key_stim.astype(int) == int(button))
     )]
     return _onset_time(keys, curr_time)
 
@@ -125,6 +129,7 @@ def last_onset(onset_df, task, curr_time, max_time=1000):
         "workingmemMB": ["Baseline", "NonTarget", "Target"],
     }
     all_stimuli  = set(np.concatenate(list(task_stimuli.values())))
+    all_stimuli.update(["1", "6"])
     onset_timing = {stimuli: max_time for stimuli in all_stimuli}
     for button in ["1", "6"]:
         onset_timing[button] = _keypress_times(onset_df, button, curr_time)
@@ -154,7 +159,7 @@ def _save(input_folder, batch, preds):
     np.save(join(input_folder, "pred.npy"), preds)
 
 def _load_row(row_path):
-    fmri      = _get_data(join(row_path, "normalized.nii.gz"))
+    fmri      = _get_data(join(row_path, "normalized.nii.gz"), is_fmri=True)
     grey      = _get_data(join(row_path, "..", "structural", "gm_probseg.nii.gz"))
     onset_df  = pd.read_csv(join(row_path, "onsets.csv"))
     return fmri, grey, onset_df
@@ -171,15 +176,13 @@ def _last_save(training_path):
 Main function
 """
 def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size=128):
-    last_save = _last_save(training_path)
     for i, row in df.iterrows():
-        if i < last_save: continue
-        print(_get(row, "project"), _get(row, "subject"), _get(row, "time_session"), _get(row, "task"))
+        if isdir(join(training_path, "%04d" % i)): continue
         TR = 2 if _get(row, "is_mb") == 0 else 0.71
         task = _get(row, "task")
-        if task == "workingmemMB":
-            continue
+        if task != "workingmemMB": continue
 
+        print(i, _get(row, "project"), _get(row, "subject"), _get(row, "time_session"), _get(row, "task"))
         row_path = _fmri_path(row)
         fmri, grey, onset_df = _load_row(row_path)
 
@@ -205,7 +208,7 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
 
             ### Fit to data
             if (j + 1) % batch_size == 0:
-                input_folder = join(training_path, "%04d/%02d" % (i, j // batch_size))
+                input_folder = join(training_path, "%04d/%02d_1" % (i, j // batch_size))
                 if not os.path.isdir(input_folder):
                     os.makedirs(input_folder)
                 batch["info"] = pd.concat([
