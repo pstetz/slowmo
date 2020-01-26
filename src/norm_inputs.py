@@ -55,6 +55,7 @@ def normalize():
     ### Get mean/std of training data
     data = _load(files)
     cols = _input_info(data)
+    del data # Free up memory
     _save_json(cols, "/Volumes/hd_4tb/results/norm.json")
 
     print("Normalizing available files...")
