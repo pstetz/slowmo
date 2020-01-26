@@ -15,6 +15,8 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
+VOL_SKIP = 300 # Note: modifications in the script are needed besides this
+
 
 """
 Masks
@@ -69,7 +71,8 @@ def _get_data(filepath, is_fmri=False):
     image = _load(filepath)
     data  = image.get_data()
     if is_fmri:
-        data  = data[:, :, :, :151]
+        #data  = data[:, :, :, VOL_SKIP:VOL_SKIP+151]
+        pass
     return data
 
 def _time_map(session):
@@ -177,10 +180,10 @@ Main function
 """
 def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size=128):
     for i, row in df.iterrows():
-        if isdir(join(training_path, "%04d" % i)): continue
+        if glob(join(training_path, "%04d/*" % i)): continue
         TR = 2 if _get(row, "is_mb") == 0 else 0.71
         task = _get(row, "task")
-        if task != "workingmemMB": continue
+        if task == "workingmemMB": continue
 
         print(i, _get(row, "project"), _get(row, "subject"), _get(row, "time_session"), _get(row, "task"))
         row_path = _fmri_path(row)
@@ -208,7 +211,7 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
 
             ### Fit to data
             if (j + 1) % batch_size == 0:
-                input_folder = join(training_path, "%04d/%02d_1" % (i, j // batch_size))
+                input_folder = join(training_path, "%04d/%02d" % (i, j // batch_size))
                 if not os.path.isdir(input_folder):
                     os.makedirs(input_folder)
                 batch["info"] = pd.concat([
