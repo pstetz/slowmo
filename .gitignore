@@ -5,3 +5,4 @@ __pycache__
 dev
 *.h5
 *.pyc
+logs
