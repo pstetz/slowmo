@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from glob import glob
 from tqdm import tqdm
-from os.path import basename, dirname, join
+from os.path import basename, dirname, isfile, join
 
 def keypress_fix(root):
     df = pd.read_csv(join(root, "..", "model_input.csv"))
@@ -22,7 +22,11 @@ def keypress_fix(root):
         TR = 2
         if task == "workingmemMB":
             TR = 0.71
-        _fix_file(f, raw_path, TR=TR)
+        try:
+            _fix_file(f, raw_path, TR=TR)
+        except Exception as e:
+            print(e)
+            print(f)
 
 def _time_map():
     _map = {
@@ -43,6 +47,9 @@ def _sample_info(df, i):
     return project, subject, time_session, task
 
 def _fix_file(filepath, raw_path, TR=2, t_index=126):
+    new_path = join(dirname(filepath), "fix_" + basename(filepath))
+    if isfile(new_path):
+        return
     onset_csv = join(raw_path, "onsets.csv")
     onsets = pd.read_csv(onset_csv)
     data = np.load(filepath, allow_pickle=True)
@@ -50,29 +57,31 @@ def _fix_file(filepath, raw_path, TR=2, t_index=126):
     for button, index in [("1", 11), ("6", 12)]:
         press = [_keypress_times(onsets, button, t * TR) for t in times]
         data[:, index] = press
-    np.save(filepath, data)
+    np.save(new_path, data)
 
-def _onset_time(onsets, curr_time):
+def _onset_time(onsets, curr_time, max_time=1000):
     onset = onsets[onsets["ons"] < curr_time]
     onset = onset.sort_values("ons", ascending=False)
     if len(onset) > 0:
         _time = onset.iloc[0].ons
         return curr_time - _time
-    return False
+    return max_time
 
 def _keypress_times(df, button, curr_time):
     df.fillna(0, inplace=True)
+    key_stim = pd.to_numeric(df["stimulus"], errors="coerce").fillna(0)
     keys = df[(
         (df["category"] == "keypress") &
-        (df["stimulus"].astype(int) == int(button))
+        (key_stim.astype(int) == int(button))
     )]
-    return _onset_time(keys, curr_time)
+    t = _onset_time(keys, curr_time)
+    return t
 
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
     if len(args) == 0:
-        root = "/Volumes/hd_4tb/results/cp_training"
+        root = "/Volumes/hd_4tb/results/training"
     else:
         root = args.pop()
     assert len(args) == 0, "inappropriate arguments %s" % " ".join(sys.argv)
