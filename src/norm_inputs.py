@@ -1,13 +1,14 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 
 from glob import glob
-from os.path import dirname, join
+from os.path import dirname, isdir, join
 from tqdm import tqdm
 
 def _load(files):
-    print("Loading avaiable files...")
+    print("Loading available files...")
 
     data = list()
     for f in tqdm(files):
@@ -29,7 +30,7 @@ def _input_info(data):
     return cols
 
 def _norm(f, cols, overwrite=True):
-    output_path = jojn(dirname(f), "norm_info.npy")
+    output_path = join(dirname(f), "norm_info.npy")
     if isfile(output_path) and overwrite:
         os.remove(output_path)
     elif isfile(output_path):
@@ -42,12 +43,19 @@ def _norm(f, cols, overwrite=True):
             data[:, i] = np.divide(np.subtract(row, cols[i]["mean"]), cols[i]["std"])
     np.save(output_path, data)
 
+def _save_json(_dict, dst):
+    if not isdir(dirname(dst)):
+        os.makedirs(dirname(dst))
+    with open(dst, "w", encoding="utf-8") as f:
+        json.dump(_dict, f, ensure_ascii=False, indent=4)
+
 def normalize():
-    files = glob(join("/Volumes/hd_4tb/results/training/*/*/info.npy"))
+    files = glob(join("/Volumes/hd_4tb/results/training/*/*/fix_info.npy"))
 
     ### Get mean/std of training data
     data = _load(files)
     cols = _input_info(data)
+    _save_json(cols, "/Volumes/hd_4tb/results/norm.json")
 
     print("Normalizing available files...")
     for f in tqdm(files):
