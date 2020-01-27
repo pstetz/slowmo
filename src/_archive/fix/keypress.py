@@ -54,8 +54,23 @@ def _fix_file(filepath, raw_path, TR=2, t_index=126):
     onsets = pd.read_csv(onset_csv)
     data = np.load(filepath, allow_pickle=True)
     times = data[:, t_index]
-    for button, index in [("1", 11), ("6", 12)]:
+    for button, index in [("1", 5), ("6", 10)]:
         press = [_keypress_times(onsets, button, t * TR) for t in times]
+        data[:, index] = press
+    for stimuli, index in [
+            ("Go",        0),
+            ("Target",    1),
+            ("Anger",     2),
+            ("Disgust",   3),
+            ("Neutral",   4),
+            ("Happy",     6),
+            ("Baseline",  7),
+            ("NoGo",      8),
+            ("Sad",       9),
+            ("Fear",      11),
+            ("NonTarget", 12),
+    ]:
+        press = [_stim_times(onsets, stimuli, t * TR) for t in times]
         data[:, index] = press
     np.save(new_path, data)
 
@@ -76,6 +91,10 @@ def _keypress_times(df, button, curr_time):
     )]
     t = _onset_time(keys, curr_time)
     return t
+
+def _stim_times(df, stimuli, curr_time):
+    stim = df[df.category == stimuli]
+    return _onset_time(stim, curr_time)
 
 if __name__ == "__main__":
     import sys
