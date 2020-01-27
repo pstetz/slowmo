@@ -192,14 +192,13 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
         info = pd.concat([pd.DataFrame(row[train_cols]).T] * batch_size).reset_index(drop=True)
 
         batch = {"prev": list(), "next": list()}
-        bold_signal, mask_rows = list(), list()
+        bold_signal, mask_rows, onsets = list(), list(), list()
         training_voxels = cartesian( available_volumes, np.array(range(1, fmri.shape[3]-1)) )
         training_index = random.sample(range(len(training_voxels)), batch_size*10)
 
         for j, index in tqdm(enumerate(training_index), total=batch_size*10):
             x, y, z, t = training_voxels[index]
-            onsets = last_onset(onset_df, task, TR * t, max_time=1000)
-            onsets = pd.concat([onsets] * batch_size).reset_index(drop=True)
+            onsets.append(last_onset(onset_df, task, TR * t, max_time=1000))
 
             mask_rows.append( _mask_info(masks, fmri, grey, (x, y, z, t))  )
             grey_data = nii_input(grey, x, y, z)
@@ -221,7 +220,7 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
                 preds = np.array(bold_signal)
                 _save(input_folder, batch, preds)
                 batch = {"prev": list(), "next": list()}
-                bold_signal, mask_rows = list(), list()
+                bold_signal, mask_rows, onsets = list(), list(), list()
 
 
 if __name__ == "__main__":
