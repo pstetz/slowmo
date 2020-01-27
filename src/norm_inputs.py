@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from glob import glob
-from os.path import dirname, isdir, join
+from os.path import dirname, isdir, isfile, join
 from tqdm import tqdm
 
 def _load(files):
@@ -12,7 +12,9 @@ def _load(files):
 
     data = list()
     for f in tqdm(files):
-        data.extend(np.load(f, allow_pickle=True))
+        file_data = np.load(f, allow_pickle=True)
+        file_data = np.nan_to_num(file_data)
+        data.extend(file_data)
     np_data = np.array(data)
     return np_data
 
@@ -49,14 +51,22 @@ def _save_json(_dict, dst):
     with open(dst, "w", encoding="utf-8") as f:
         json.dump(_dict, f, ensure_ascii=False, indent=4)
 
+def _load_json(filepath):
+    with open(filepath, "r") as f:
+        return json.load(f)
+
 def normalize():
     files = glob(join("/Volumes/hd_4tb/results/training/*/*/fix_info.npy"))
 
     ### Get mean/std of training data
-    data = _load(files)
-    cols = _input_info(data)
-    del data # Free up memory
-    _save_json(cols, "/Volumes/hd_4tb/results/norm.json")
+    json_path = "/Volumes/hd_4tb/results/norm.json"
+    if not isfile(json_path):
+        data = _load(files)
+        cols = _input_info(data)
+        del data # Free up memory
+        _save_json(cols, json_path)
+    else:
+        cols = _load_json(json_path)
 
     print("Normalizing available files...")
     for f in tqdm(files):
