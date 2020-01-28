@@ -102,15 +102,15 @@ def nii_input(data, x, y, z, r = 4):
 """
 Onsets
 """
-def _onset_time(onsets, curr_time):
+def _onset_time(onsets, curr_time, max_time=1000):
     onset = onsets[onsets["ons"] < curr_time]
     onset = onset.sort_values("ons", ascending=False)
     if len(onset) > 0:
         _time = onset.iloc[0].ons
         return curr_time - _time
-    return False
+    return max_time
 
-def _stim_time(df, stimuli, curr_time):
+def _stim_times(df, stimuli, curr_time):
     stim = df[df.category == stimuli]
     return _onset_time(stim, curr_time)
 
@@ -121,7 +121,8 @@ def _keypress_times(df, button, curr_time):
         (df["category"] == "keypress") &
         (key_stim.astype(int) == int(button))
     )]
-    return _onset_time(keys, curr_time)
+    t = _onset_time(keys, curr_time)
+    return t
 
 def last_onset(onset_df, task, curr_time, max_time=1000):
     task_stimuli = {
@@ -138,7 +139,7 @@ def last_onset(onset_df, task, curr_time, max_time=1000):
         onset_timing[button] = _keypress_times(onset_df, button, curr_time)
 
     for stimuli in task_stimuli[task]:
-        _time = _stim_time(onset_df, stimuli, curr_time)
+        _time = _stim_times(onset_df, stimuli, curr_time)
         if _time:
             onset_timing[stimuli] = _time
     df = pd.DataFrame(onset_timing, index=[1])
