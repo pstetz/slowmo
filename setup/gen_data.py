@@ -176,6 +176,12 @@ def _last_save(training_path):
     i = os.path.basename(i)
     return int(i) + 1
 
+ONSETS = [
+        "Go", "Target", "Anger", "Disgust",
+        "Neutral", "1", "Happy", "Baseline",
+        "NoGo", "Sad", "6", "Fear", "NonTarget"
+]
+
 """
 Main function
 """
@@ -212,6 +218,8 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
             ### Fit to data
             if (j + 1) % batch_size == 0:
                 input_folder = join(training_path, "%04d/%02d" % (i, j // batch_size))
+                onsets = pd.concat(onsets, ignore_index=True)
+                onsets = onsets[ONSETS]
                 if not os.path.isdir(input_folder):
                     os.makedirs(input_folder)
                 batch["info"] = pd.concat([
