@@ -40,9 +40,11 @@ def _norm(f, cols, overwrite=True):
 
     data = np.load(f, allow_pickle=True)
     for i in cols:
-        row = data.copy()[:, i]
-        if cols[i]["std"] != 0:
-            data[:, i] = np.divide(np.subtract(row, cols[i]["mean"]), cols[i]["std"])
+        i = int(i)
+        i_dict = cols[str(i)]
+        row = data.copy()
+        row = row[:, i]
+        data[:, i] = np.divide(np.subtract(row, i_dict["mean"]), i_dict["std"])
     np.save(output_path, data)
 
 def _save_json(_dict, dst):
@@ -56,10 +58,10 @@ def _load_json(filepath):
         return json.load(f)
 
 def normalize():
-    files = glob(join("/Volumes/hd_4tb/results/training/*/*/fix_info.npy"))
+    files = glob(join("/Volumes/hd_4tb/results/training/*/*/2_fix_info.npy"))
 
     ### Get mean/std of training data
-    json_path = "/Volumes/hd_4tb/results/norm.json"
+    json_path = "/Volumes/hd_4tb/results/summary/norm.json"
     if not isfile(json_path):
         data = _load(files)
         cols = _input_info(data)
@@ -70,7 +72,7 @@ def normalize():
 
     print("Normalizing available files...")
     for f in tqdm(files):
-        _norm(f, cols)
+        _norm(f, cols, overwrite=False)
 
 if __name__ == "__main__":
     normalize()
