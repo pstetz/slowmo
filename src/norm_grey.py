@@ -13,7 +13,7 @@ def norm_grey_matter(root, stats_file):
     for t in ("prev", "next"):
         print("Normalizing %s..." % t)
         for f in tqdm(glob(join(root, "*", "*", "%s.npy" % t))):
-            output_path = join(dirname(f), "norm_%s.npy")
+            output_path = join(dirname(f), "norm_%s.npy" % t)
             data = np.load(f)
             if isfile(output_path):
                 continue
