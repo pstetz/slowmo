@@ -40,11 +40,10 @@ def _norm(f, cols, overwrite=True):
 
     data = np.load(f, allow_pickle=True)
     for i in cols:
-        i = int(i)
-        i_dict = cols[str(i)]
+        i_dict = cols[i]
         row = data.copy()
-        row = row[:, i]
-        data[:, i] = np.divide(np.subtract(row, i_dict["mean"]), i_dict["std"])
+        row = row[:, int(i)]
+        data[:, int(i)] = np.divide(np.subtract(row, i_dict["mean"]), i_dict["std"])
     np.save(output_path, data)
 
 def _save_json(_dict, dst):
