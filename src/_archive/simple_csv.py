@@ -32,7 +32,7 @@ def _get_fmri(filepath):
 
 if __name__ == "__main__":
     root = "/Volumes/hd_4tb/results/training"
-    np_key = join(root, "..", "info_order.json")
+    np_key = join(root, "..", "summary", "info_order.json")
     with open(np_key, "r") as f:
         np_key = json.load(f)
     create_simple_csv(root, np_key)

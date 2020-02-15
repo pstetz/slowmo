@@ -12,7 +12,7 @@ from tqdm import tqdm
 from os.path import basename, dirname, isfile, join
 
 def keypress_fix(root):
-    df = pd.read_csv(join(root, "..", "model_input.csv"))
+    df = pd.read_csv(join(root, "..", "summary", "model_input.csv"))
     files = glob(join(root, "*", "*", "info.npy"))
 
     for f in tqdm(files):
