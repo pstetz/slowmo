@@ -233,7 +233,10 @@ def log_parser(log_filepath, dst_path, task):
     trials = _seperate_by_trial(parsed)
 
     df = generate_onsets(trials, task)
-    time_0 = find_time_zero(parsed)
+    if task == "workingmemMB":
+        time_0 = find_time_zero(parsed, delay=8.52)
+    else:
+        time_0 = find_time_zero(parsed)
     df["ons"] = df["ons"] - time_0
     df.sort_values("ons", inplace = True)
     df.to_csv(dst_path, index=False)
