@@ -7,9 +7,9 @@ from tqdm import tqdm
 from os.path import basename, dirname, isdir, isfile, join
 
 def create_simple_csv(root, np_key):
-    files = glob(join(root, "*", "*", "2_fix_info.npy"))
+    files = glob(join(root, "*", "*", "norm_info.npy"))
     for f in tqdm(files):
-        dst = join(dirname(f), "simple.csv")
+        dst = join(dirname(f), "norm_simple.csv")
         if isfile(dst):
             continue
         data = np.load(f, allow_pickle=True)
@@ -23,8 +23,8 @@ def create_simple_csv(root, np_key):
         pd.DataFrame(columns).to_csv(dst, index=False)
 
 def _get_fmri(filepath):
-    prev_data = np.load(join(dirname(filepath), "prev.npy"))
-    next_data = np.load(join(dirname(filepath), "next.npy"))
+    prev_data = np.load(join(dirname(filepath), "norm_prev.npy"))
+    next_data = np.load(join(dirname(filepath), "norm_next.npy"))
     _prev = prev_data[:, 4, 4, 4, 0]
     _next = next_data[:, 4, 4, 4, 0]
     _grey = next_data[:, 4, 4, 4, 1]
