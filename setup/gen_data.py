@@ -15,13 +15,13 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-VOL_SKIP = 300 # Note: modifications in the script are needed besides this
+# VOL_SKIP = 300 # Note: modifications in the script are needed besides this
 
 
 """
 Masks
 """
-def _load_masks(mask_dir):
+def load_masks(mask_dir):
     masks = glob(join(mask_dir, "*"))
     masks = [{
         "code": os.path.basename(mask).split("_")[0],
@@ -29,7 +29,7 @@ def _load_masks(mask_dir):
     } for mask in masks]
     return masks
 
-def _in_mask(masks, x, y, z):
+def in_mask(masks, x, y, z):
     result = dict()
     for mask in masks:
         code = mask["code"]
@@ -37,7 +37,7 @@ def _in_mask(masks, x, y, z):
         result["in_%s" % code] = int(bool(data[x, y, z]))
     return result
 
-def _mean_activation(masks, fmri, grey, t, label):
+def mean_activation(masks, fmri, grey, t, label):
     activations = dict()
     for mask in masks:
         code, data = mask["code"], mask["data"]
@@ -45,7 +45,7 @@ def _mean_activation(masks, fmri, grey, t, label):
         activations["mean_%s_%s" % (code, label)] = np.mean( np.multiply(grey, region) )
     return activations
 
-def _mask_info(masks, fmri, grey, coord):
+def mask_info(masks, fmri, grey, coord):
     x, y, z, t = coord
     info = _in_mask(masks, x, y, z)
     for timepoint, label in [(t-1, "prev"), (t+1, "next")]:
@@ -60,7 +60,7 @@ def _mask_info(masks, fmri, grey, coord):
 """
 fMRI
 """
-def _load_volume(fmri, x, y, z, t):
+def load_volume(fmri, x, y, z, t):
     volume = nii_input(fmri[:, :, :, t], x, y, z)
     return np.array(volume)
 
@@ -75,7 +75,7 @@ def _get_data(filepath, is_fmri=False):
         pass
     return data
 
-def _time_map(session):
+def time_map(session):
     _map = {
         "s1": "000", "s2": "2MO", "s3": "6MO", "s4": "12MO", "s5": "24MO"
     }
@@ -84,7 +84,7 @@ def _time_map(session):
 def _get(row, item):
     return row[item]
 
-def _fmri_path(row):
+def fmri_path(row):
     _input = "/Volumes/hd_4tb/raw"
     project = _get(row, "project")
     subject = _get(row, "subject")
@@ -110,11 +110,11 @@ def _onset_time(onsets, curr_time, max_time=1000):
         return curr_time - _time
     return max_time
 
-def _stim_times(df, stimuli, curr_time):
+def stim_times(df, stimuli, curr_time):
     stim = df[df.category == stimuli]
     return _onset_time(stim, curr_time)
 
-def _keypress_times(df, button, curr_time):
+def keypress_times(df, button, curr_time):
     df.fillna(0, inplace=True)
     key_stim = pd.to_numeric(df["stimulus"], errors="coerce").fillna(0)
     keys = df[(
@@ -136,10 +136,10 @@ def last_onset(onset_df, task, curr_time, max_time=1000):
     all_stimuli.update(["1", "6"])
     onset_timing = {stimuli: max_time for stimuli in all_stimuli}
     for button in ["1", "6"]:
-        onset_timing[button] = _keypress_times(onset_df, button, curr_time)
+        onset_timing[button] = keypress_times(onset_df, button, curr_time)
 
     for stimuli in task_stimuli[task]:
-        _time = _stim_times(onset_df, stimuli, curr_time)
+        _time = stim_times(onset_df, stimuli, curr_time)
         if _time:
             onset_timing[stimuli] = _time
     df = pd.DataFrame(onset_timing, index=[1])
@@ -162,7 +162,7 @@ def _save(input_folder, batch, preds):
     np.save(join(input_folder, "info.npy"), batch["info"])
     np.save(join(input_folder, "pred.npy"), preds)
 
-def _load_row(row_path):
+def load_row(row_path):
     fmri      = _get_data(join(row_path, "normalized.nii.gz"), is_fmri=True)
     grey      = _get_data(join(row_path, "..", "structural", "gm_probseg.nii.gz"))
     onset_df  = pd.read_csv(join(row_path, "onsets.csv"))
@@ -207,7 +207,7 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
             x, y, z, t = training_voxels[index]
             onsets.append(last_onset(onset_df, task, TR * t, max_time=1000))
 
-            mask_rows.append( _mask_info(masks, fmri, grey, (x, y, z, t))  )
+            mask_rows.append( mask_info(masks, fmri, grey, (x, y, z, t))  )
             grey_data = nii_input(grey, x, y, z)
             for name, timepoint in [("prev", t-1), ("next", t+1)]:
                 batch[name].append(
@@ -235,7 +235,7 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
 if __name__ == "__main__":
     root = "/Volumes/hd_4tb"
     assert os.path.isdir(root), "Connect external harddrive!  Cannot find %s" % root
-    masks = _load_masks( join(root, "masks", "plip") )
+    masks = load_masks( join(root, "masks", "plip") )
 
     df                = pd.read_csv(join(root, "project", "model_input.csv"))
     available_volumes = np.load("./available_volumes.npy")
