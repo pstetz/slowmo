@@ -19,7 +19,6 @@ def norm_grey_matter(root, stats_file):
                 continue
             data[:, :, :, :, 1] = np.divide(np.subtract(data[:, :, :, :, 1], mn), std)
             np.save(output_path, data)
-    os.remove(stats_file)
 
 def _find_mean_std(stats_file):
     with open(stats_file, "r") as f:
@@ -31,7 +30,7 @@ def _find_mean_std(stats_file):
         means.append(v["mean"])
         stds.append(v["std"])
     mn = sum(means) / len(means)
-    std = sum([e**2 for e in stds]) ** 0.5
+    std = (sum([e**2 for e in stds]) / len(means)) ** 0.5
     return mn, std
 
 def find_subject_stats(root, stats_file):
