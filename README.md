@@ -15,25 +15,18 @@ In the original SlowMo [paper presented here](https://people.cs.umass.edu/~hzjia
 While this sounds like a lot we have just as much.  CONNECTOME, ENGAGE, and RAD have a combined ~1,500 sessions on Flywheel and a estimate of 3 tasks per session and 150 volumes per task mean we have 675,000 individual frames
 
 
-### Classes
-
-There are 4 classes that are helpful to abstract away a lot of details
-
-- Button.  Gathers all relevant button logs and can filter from there.
-- Cloud.   Pulls data from flywheel
-- (unused) Dicom.   This is helpful, so I don't need to remember pydicom details.  Also it will load all dicoms and gather relevant information by specifying a dicom directory
-- (unused) Model.   Helps load and save the model.  This is useful because this will run over several weeks maybe and I want to checkpoint progress
-
-
 ### Todo
 
 - Make the nifti movies more stylistic (add flashes when updating, work on colors, 3 dimensional, structural image in background)
 - Collect all demographic information that should go in model
-- Normalize the model inputs
-- Fix the onsets for the keypresses
+- Compare MSE of multiband with singleband
+- Make working model of lgbm and cnn
+- Interpolate an series to around 16 fps
 
 
 ### Done
+- Normalize the model inputs
+- Fix the onsets for the keypresses
 - Decide if modeling on dicoms is better or if processed images would work
   - Nifti are better I think although ones that are not slice time corrected might be better.
 - Gather the movement for all tasks in the same CSV
