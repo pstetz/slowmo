@@ -43,6 +43,8 @@ def _norm(f, cols, overwrite=True):
         i_dict = cols[i]
         row = data.copy()
         row = row[:, int(i)]
+        if int(i) < 13: # change the onset times to be between 0s and 15s
+            row = np.clip(row, 0, 15)
         data[:, int(i)] = np.divide(np.subtract(row, i_dict["mean"]), i_dict["std"])
     np.save(output_path, data)
 
