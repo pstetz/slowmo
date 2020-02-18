@@ -8,7 +8,6 @@ import pandas as pd
 import nibabel as nib
 
 from glob import glob
-from tqdm import tqdm
 from os.path import isdir, isfile, join
 
 import warnings
@@ -84,13 +83,12 @@ def time_map(session):
 def _get(row, item):
     return row[item]
 
-def fmri_path(row):
-    _input = "/Volumes/hd_4tb/raw"
+def fmri_path(root, row):
     project = _get(row, "project")
     subject = _get(row, "subject")
     time_session = _get(row, "time_session")
     task = _get(row, "task")
-    return join(_input, project, _time_map(time_session), subject, task)
+    return join(root, project, time_map(time_session), subject, task)
 
 def nii_input(data, x, y, z, r = 4):
     return data[
@@ -185,7 +183,8 @@ ONSETS = [
 """
 Main function
 """
-def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size=128):
+def gen_data(df, train_cols, available_volumes, training_path, masks, root, batch_size=128):
+    from tqdm import tqdm
     for i, row in df.iterrows():
         if glob(join(training_path, "%04d/*" % i)): continue
         TR = 2 if _get(row, "is_mb") == 0 else 0.71
@@ -193,7 +192,7 @@ def gen_data(df, train_cols, available_volumes, training_path, masks, batch_size
         if task == "workingmemMB": continue
 
         print(i, _get(row, "project"), _get(row, "subject"), _get(row, "time_session"), _get(row, "task"))
-        row_path = _fmri_path(row)
+        row_path = fmri_path(join(root, "raw"), row)
         fmri, grey, onset_df = _load_row(row_path)
 
         info = pd.concat([pd.DataFrame(row[train_cols]).T] * batch_size).reset_index(drop=True)
@@ -242,5 +241,5 @@ if __name__ == "__main__":
     train_cols        = [c for c in df.columns if c.startswith("is_")] + ["age"]
 
     training_path = join(root, "results", "training")
-    gen_data(df, train_cols, available_volumes, training_path, masks)
+    gen_data(df, train_cols, available_volumes, training_path, masks, root)
 
