@@ -37,7 +37,7 @@ if __name__ == "__main__":
     training = join(root, "training")
     output_dir = join(root, "summary", "consolidate")
 
-    items = np.array(glob(join(root, "*")))
+    items = np.array(glob(join(training, "*")))
     np.random.shuffle(items)
     for i, folders in enumerate(np.array_split(items, 20)):
         consolidate(folders, join(output_dir, "all_%02d.pkl" % i))
