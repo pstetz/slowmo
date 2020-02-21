@@ -10,7 +10,7 @@ from gen_data import *
 root = "/Users/pstetz/Desktop/confidential/.project"
 
 # model = keras.models.load_model("/Volumes/hd_4tb/results/runs/run_2/2_nonlinear.h5")
-model_path = join(root, "run/lgbm/3_full_data.pkl")
+model_path = join(root, "run/lgbm/4_mae.pkl")
 with open(model_path, "rb") as f:
     model = pickle.load(f)
 
@@ -36,15 +36,6 @@ def _grey_mean_std(stats_file):
     std = (sum([e**2 for e in stds]) / len(means)) ** 0.5
     return mn, std
 
-df = pd.read_csv(join(root, "summary/model_input.csv"))
-onset_df = pd.read_csv(join(root, "interpolate/raw/conn152/gonogo/onsets.csv"))
-gvol = nib.load(join(root, "interpolate/raw/conn152/structural/gm_probseg.nii.gz")).get_fdata()
-grey_mean, grey_std = _grey_mean_std(join(root, "summary/grey_norm.json"))
-gvol[:, :, :] = np.divide(np.subtract(gvol[:, :, :], grey_mean), grey_std)
-
-mask_dir = join(root, "masks")
-masks = load_masks(mask_dir)
-train_cols = [c for c in df.columns if c.startswith("is_")] + ["age"]
 
 def _inbetween_file(path1, path2):
     """
@@ -65,7 +56,7 @@ def _get_time(path, TR=2):
     if "_" not in name:
         return TR * int(name)
     _time = int(name.split("_")[0]) * TR
-    for i, c in name.split("_")[1]:
+    for i, c in enumerate(name.split("_")[1]):
         if c == "a":
             _time -= 1 / 2**(i+1)
         elif c == "z":
@@ -89,10 +80,10 @@ def mean_activation(masks, pvol, nvol, gvol):
             activations["mean_%s_%s" % (code, label)] = np.mean( np.multiply(gvol, region) )
     return activations
 
-def at_most_level(num, filepath):
+def at_most_level(num, filepath, low, high):
     name = basename(filepath)
     t = int(name.split(".")[0].split("_")[0])
-    if t > 20:
+    if t < low or t > high:
         return False
     if "_" not in name:
         return 0 <= num
@@ -116,19 +107,40 @@ def guess_volume(
             norm_x = norm_features(x, norm_info)
             for label, data in [("prev", pvol), ("next", nvol), ("grey", gvol)]:
                 norm_x[label] = data[i, j, :]
-            volume[i, j, :] = model.predict(norm_x)
+            preds = model.predict(norm_x)
+            volume[i, j, :] = preds
     return np.multiply(volume, mask)
 
-volume_dir = join(root, "interpolate/volumes")
 
-record = 291 # CONN152 gonogo
 TR = 2 # seconds
+record = 290 # CONN152 conscious
+df = pd.read_csv(join(root, "summary/model_input.csv"))
+volume_dir = join(root, "interpolate/volumes_%d" % record)
+
+task_name = df.loc[record, "task"]
+subject = df.loc[record, "subject"]
+
+onset_df = pd.read_csv(join(root, "interpolate/raw/%s/%s/onsets.csv" % (subject, task_name)))
+gvol = nib.load(join(root, "interpolate/raw/%s/structural/gm_probseg.nii.gz" % subject)).get_fdata()
+grey_mean, grey_std = _grey_mean_std(join(root, "summary/grey_norm.json"))
+gvol[:, :, :] = np.divide(np.subtract(gvol[:, :, :], grey_mean), grey_std)
+
+### Masks
+mask_dir = join(root, "masks")
+masks = load_masks(mask_dir)
+
+### Subject df
+train_cols = [c for c in df.columns if c.startswith("is_")] + ["age"]
 subject_df = pd.DataFrame(df.iloc[record][train_cols]).T.reset_index(drop=True)
 
+import sys
+args = sys.argv[1:]
+low  = int(args[0])
+high = int(args[1])
 for lvl in range(6):
     print("Interpolating on a %.2f second interval" % (TR / (2 ** (lvl + 1))))
     files = list(sorted(glob(join(volume_dir, "*"))))
-    files = [f for f in files if at_most_level(lvl, f)]
+    files = [f for f in files if at_most_level(lvl, f, low, high)]
     for i in range(len(files) - 1):
         file1, file2 = files[i], files[i + 1]
         dst = _inbetween_file(file1, file2)
@@ -141,7 +153,7 @@ for lvl in range(6):
         nvol = np.load(file2)
         t = (_get_time(file1, TR=TR) + _get_time(file2, TR=TR)) / 2
 
-        onsets = last_onset(onset_df, "gonogo", t).reset_index(drop=True)
+        onsets = last_onset(onset_df, task_name, t).reset_index(drop=True)
         mask_activations = mean_activation(masks, pvol, nvol, gvol)
         stable_x = pd.concat([subject_df, onsets], axis=1)
         for k, v in mask_activations.items():
