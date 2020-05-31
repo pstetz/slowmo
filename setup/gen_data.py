@@ -8,6 +8,7 @@ import pandas as pd
 import nibabel as nib
 
 from glob import glob
+from tqdm import tqdm
 from os.path import isdir, isfile, join
 
 import warnings
@@ -73,12 +74,6 @@ def _get_data(filepath, is_fmri=False):
         #data  = data[:, :, :, VOL_SKIP:VOL_SKIP+151]
         pass
     return data
-
-def time_map(session):
-    _map = {
-        "s1": "000", "s2": "2MO", "s3": "6MO", "s4": "12MO", "s5": "24MO"
-    }
-    return _map[session]
 
 def _get(row, item):
     return row[item]
@@ -155,16 +150,18 @@ def cartesian(data, timepoints):
     return ret
 
 def _save(input_folder, batch, preds):
-    np.save(join(input_folder, "prev.npy"), batch["prev"])
-    np.save(join(input_folder, "next.npy"), batch["next"])
-    np.save(join(input_folder, "info.npy"), batch["info"])
+    for name in ["prev", "next", "gm", "wm", "csf", "info"]:
+        np.save(join(input_folder, f"{name}.npy"), batch[name])
     np.save(join(input_folder, "pred.npy"), preds)
 
 def load_row(row_path):
     fmri      = _get_data(join(row_path, "normalized.nii.gz"), is_fmri=True)
-    grey      = _get_data(join(row_path, "..", "structural", "gm_probseg.nii.gz"))
     onset_df  = pd.read_csv(join(row_path, "onsets.csv"))
-    return fmri, grey, onset_df
+
+    anat["gm"]  = _get_data(join(row_path, "..", "structural", "gm_probseg.nii.gz"))
+    anat["wm"]  = _get_data(join(row_path, "..", "structural", "wm_probseg.nii.gz"))
+    anat["csf"] = _get_data(join(row_path, "..", "structural", "csf_probseg.nii.gz"))
+    return fmri, onset_df, anat
 
 def _last_save(training_path):
     training = glob(join(training_path, "*"))
@@ -182,44 +179,43 @@ ONSETS = [
 
 """
 Main function
+FIXME: find a way to speed up processing if the task has a lot of volumes
 """
 def gen_data(df, train_cols, available_volumes, training_path, masks, root, batch_size=128):
-    from tqdm import tqdm
     for i, row in df.iterrows():
         if glob(join(training_path, "%04d/*" % i)): continue
-        TR = 2 if _get(row, "is_mb") == 0 else 0.71
+        TR = _get(row, "TR")
         task = _get(row, "task")
-        if task == "workingmemMB": continue
+        print(i, _get(row, "project"), _get(row, "subject"), _get(row, "task"))
 
-        print(i, _get(row, "project"), _get(row, "subject"), _get(row, "time_session"), _get(row, "task"))
         row_path = fmri_path(join(root, "raw"), row)
-        fmri, grey, onset_df = _load_row(row_path)
+        fmri, onset_df, anat = _load_row(row_path)
 
         info = pd.concat([pd.DataFrame(row[train_cols]).T] * batch_size).reset_index(drop=True)
 
-        batch = {"prev": list(), "next": list()}
+        batch = {name: list() for name in ["prev", "next", "gm", "wm", "csf"]}
         bold_signal, mask_rows, onsets = list(), list(), list()
-        training_voxels = cartesian( available_volumes, np.array(range(1, fmri.shape[3]-1)) )
+
+        training_voxels = cartesian( available_volumes, np.array(range(2, fmri.shape[3]-2)) )
         training_index = random.sample(range(len(training_voxels)), batch_size*10)
 
         for j, index in tqdm(enumerate(training_index), total=batch_size*10):
             x, y, z, t = training_voxels[index]
-            onsets.append(last_onset(onset_df, task, TR * t, max_time=1000))
 
+            _append_voxel(batch)
+
+            onsets.append(last_onset(onset_df, task, TR * t, max_time=1000))
             mask_rows.append( mask_info(masks, fmri, grey, (x, y, z, t))  )
-            grey_data = nii_input(grey, x, y, z)
             for name, timepoint in [("prev", t-1), ("next", t+1)]:
-                batch[name].append(
-                    np.stack((_load_volume(fmri, x, y, z, timepoint), grey_data), axis=3)
-                )
+                batch[name].append(_load_volume(fmri, x, y, z, timepoint))
+            for name in anat:
+                batch[name].append(nii_input(anat[name], x, y, z))
             bold_signal.append(fmri[x, y, z, t])
 
-            ### Fit to data
             if (j + 1) % batch_size == 0:
                 input_folder = join(training_path, "%04d/%02d" % (i, j // batch_size))
-                onsets = pd.concat(onsets, ignore_index=True)
-                onsets = onsets[ONSETS]
-                if not os.path.isdir(input_folder):
+                onsets = pd.concat(onsets, ignore_index=True)[ONSETS]
+                if not isdir(input_folder):
                     os.makedirs(input_folder)
                 batch["info"] = pd.concat([
                     onsets, info, pd.DataFrame(mask_rows)
