@@ -5,14 +5,6 @@ from glob import glob
 from tqdm import tqdm
 from os.path import join
 
-def _std(data, axis=3):
-    """ Gets the std of the image over time """
-    return np.std(data, axis=axis)
-
-def _mean(data, axis=3):
-    """ Gets the mean of the image over time """
-    return np.mean(data, axis=axis)
-
 def _norm(data, mask_data):
     """ Subtracts the mean and divides by the std """
     std_data  = _std(data)
@@ -72,6 +64,5 @@ def normalize_project(root, project, mask):
 if __name__ == "__main__":
     root = "/Volumes/hd_4tb/raw"
     mask = "/Volumes/hd_4tb/masks/mni/MNI152_T1_2mm_brain_mask.nii.gz"
-    projects = ["connhc", "connmdd", "engage", "engage2", "rad"]
     for project in projects:
         normalize_project(root, project, mask)
