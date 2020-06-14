@@ -26,10 +26,15 @@ def transfer_func(session_path, subject, session, dst_dir):
     tail = "space-MNI152NLin6Asym_desc-smoothAROMAnonaggr_bold.nii.gz"
     for task_name, mb, direction in tasks:
         filename = f"{subject}_{session}_task-{task_name}_acq-{mb}_dir-{direction}_{tail}"
+        tsv_name = f"{subject}_{session}_task-{task_name}_acq-{mb}_dir-{direction}_desc-confounds_regressors.tsv"
         filepath = join(session_path, "func", filename)
+        tsv_path = join(session_path, "func", tsv_name)
         if not isfile(filepath): continue
-        dst = join(dst_dir, subject.replace("sub-", "").lower(), "func", filename)
-        _copy(filepath, dst)
+        task_dir = join(dst_dir, subject.replace("sub-", "").lower(), "func", "%s-%s" % (task_name, direction))
+        dst = join(task_dir, filename)
+
+        _copy(filepath, join(task_dir, filename))
+        _copy(tsv_path, join(task_dir, tsv_name))
 
 def transfer_anat(subject_path, subject, dst_dir):
     for anat in ["WM", "GM", "CSF"]:
@@ -55,7 +60,7 @@ def main(root, dst_dir):
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
-    root = "/Users/pstetz/Desktop/server/ramirezc/hcpdes_preprocessed_04-2020/derivatives/functional_derivatives/"
+    root = "/Users/pbezuhov/Desktop/server/ramirezc/hcpdes_preprocessed_04-2020/derivatives/functional_derivatives/"
     dst_dir = "/Volumes/hd_4tb/slowmo/data/fmri/connectome"
     main(root, dst_dir)
 
