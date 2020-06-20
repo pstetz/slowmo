@@ -57,19 +57,15 @@ def cartesian(data, timepoints):
             ret.append((x, y, z, t))
     return ret
 
-def _save(input_folder, batch, preds):
-    for name in ["prev", "next", "gm", "wm", "csf", "info"]:
-        np.save(join(input_folder, f"{name}.npy"), batch[name])
-    np.save(join(input_folder, "pred.npy"), preds)
+def row_images(root, row):
+    row_path = join(root, row["subject"], "func", row["task"])
+    fmri     = get_data(join(row_path, row["filename"]))
 
-def load_row(row_path):
-    fmri      = _get_data(join(row_path, "normalized.nii.gz"), is_fmri=True)
-    onset_df  = pd.read_csv(join(row_path, "onsets.csv"))
-
-    anat["gm"]  = _get_data(join(row_path, "..", "structural", "gm_probseg.nii.gz"))
-    anat["wm"]  = _get_data(join(row_path, "..", "structural", "wm_probseg.nii.gz"))
-    anat["csf"] = _get_data(join(row_path, "..", "structural", "csf_probseg.nii.gz"))
-    return fmri, onset_df, anat
+    anat = dict()
+    anat_dir = join(row_path, "..", "..", "anat")
+    for name in ["gm", "wm", "csf"]:
+        anat[name]  = get_data(join(anat_dir, "%s_probseg.nii.gz" % name))
+    return fmri, anat
 
 def _last_save(training_path):
     training = glob(join(training_path, "*"))
@@ -79,20 +75,20 @@ def _last_save(training_path):
     i = os.path.basename(i)
     return int(i) + 1
 
-ONSETS = [
-        "Go", "Target", "Anger", "Disgust",
-        "Neutral", "1", "Happy", "Baseline",
-        "NoGo", "Sad", "6", "Fear", "NonTarget"
-]
-
 def setup_task_info():
     TR = _get(row, "TR")
     task = _get(row, "task")
     print(i, _get(row, "project"), _get(row, "subject"), _get(row, "task"))
     return task_info
 
-def setup_info():
-    info = pd.concat([pd.DataFrame(row[train_cols]).T] * batch_size).reset_index(drop=True)
+def setup_info(row):
+    info = dict()
+    info["general"] = dict()
+    info["mri"] = list(); info["onsets"] = list()
+    for key, value in row.items():
+        if key in ONSETS_ORDER.keys():
+            info["general"][key] = value
+    return info
 
 def setup_voxels():
     """
@@ -113,15 +109,20 @@ def append_anat(anat, batch, x, y, z):
         batch[name].append(img_region(anat[name], x, y, z, r=RADIUS))
 
 def append_func(fmri, batch, x, y, z, t):
-    for name, timepoint in [("prev", t-1), ("next", t+1)]:
+    for name, timepoint in [
+            ("prev_1", t-1), ("prev_2", t-2),
+            ("next_1", t+1), ("next_2", t+2)
+            ]:
         batch[name].append(img_region(fmri[:, :, :, timpoint], x, y, z, r=RADIUS))
 
-def append_masks():
-    info["mask"].append
-    mask_rows.append( mask_info(masks, fmri, grey, (x, y, z, t))  )
+def append_mris():
+    row = mask_info(masks, fmri, grey, (x, y, z, t))
+    for name, value in [("x", x), ("y", y), ("z", z), ("t", t)]:
+        row[name] = value
+    info["mri"].append(row)
 
 def combine_info(info):
-    mask = pd.DataFrame(info["masks"])
+    mri    = pd.DataFrame(info["mri"])
     onsets = pd.DataFrame(info["onsets"])
     df = pd.concat(mask, onsets, ignore_index=True, axis=1) #FIXME: double check the shape
     for key, value in info["general"].items():
@@ -135,28 +136,30 @@ def checkpoint()
     batch["info"] = pd.concat([
         onsets, info, pd.DataFrame(mask_rows)
     ], axis=1)
-    batch["prev"], batch["next"] = np.array(batch["prev"]), np.array(batch["next"])
-    preds = np.array(bold_signal)
-    _save(input_folder, batch, preds)
 
-    bold_signal.clear(); mask_rows.clear(); onsets.clear()
     for name in batch:
+        arr = np.array(batch[name])
+        np.save(join(input_folder, f"{name}.npy"), arr)
         batch[name].clear()
+
+    np.save(join(input_folder, "bold.npy"), np.array(bold_signal))
+
+    info_df.to_csv
+    bold_signal.clear(); mask_rows.clear(); onsets.clear()
 
 
 def append_onsets()
     onsets.append(last_onset(onset_df, task, TR * t, max_time=1000))
 
-def gen_data(df, train_cols, training_path, masks, root, batch_size=128):
+def gen_data(df, training_path, masks, root, batch_size=128):
     for i, row in df.iterrows():
         dst_group = join(train_path, "%04d" % i)
         if glob(join(dst_group, "*")): continue
 
-        anat = load_anats()
         info = setup_info(row)
         fmri, anat = row_images(row)
 
-        batch = {name: list() for name in ["prev", "next", "gm", "wm", "csf"]}
+        batch = {name: list() for name in ["prev_1", "prev_2", "next_1", "next_2", "gm", "wm", "csf"]}
         bold_signal = list()
 
         training_voxels = setup_voxels()
@@ -167,7 +170,7 @@ def gen_data(df, train_cols, training_path, masks, root, batch_size=128):
             bold.append(fmri[x, y, z, t])
             append_anat(anat, batch, x, y, z)
             append_func(fmri, batch, x, y, z, t)
-            append_mask(fmri, anat, info, x, y, z, t)
+            append_mri(fmri, anat, info, x, y, z, t)
             append_onsets(fmri, info, t)
 
             if (j + 1) % batch_size == 0:
@@ -175,32 +178,10 @@ def gen_data(df, train_cols, training_path, masks, root, batch_size=128):
 
 
 if __name__ == "__main__":
-    root = "/Volumes/hd_4tb"
+    root = "/Volumes/hd_4tb/slowmo/data"
     assert os.path.isdir(root), "Connect external harddrive!  Cannot find %s" % root
     masks = load_masks( join(root, "masks", "plip") )
-
-    df                = pd.read_csv(join(root, "project", "model_input.csv"))
-    train_cols        = [c for c in df.columns if c.startswith("is_")] + ["age"]
-
+    df            = pd.read_csv(join(root, "project", "model_input.csv"))
     training_path = join(root, "results", "training")
-    gen_data(df, train_cols, training_path, masks, root)
+    gen_data(df, training_path, masks, root)
 
-"""
-gen_data
-FIXME: find a way to speed up processing if the task has a lot of volumes
-"""
-    """
-    -- Features
-    info.npy # contains
-        webneuro, redcap, some task info (sms, pe0/pe1, x, y, z, t, etc),
-        onsets, and mask relevant information
-        ** Looks like {"general": {...}. "onsets": [{...}, ...], "masks": [{...}, ...]
-    gm.npy # grey matter image
-    wm.npy # white matter image
-    csf.npy # CSF image
-    prev.npy # Previous fMRI data
-    next.npy # Next fMRI data
-
-    -- Target
-    bold.npy # The voxel series to be predicted
-    """
