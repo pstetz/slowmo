@@ -1,15 +1,8 @@
-import os
-import shutil
 from glob import glob
 from tqdm import tqdm
-from os.path import basename, dirname, isdir, isfile, join
+from helpers.helpers import copy
+from os.path import basename, dirname, isfile, join
 
-def _copy(src, dst):
-    if not isdir(dirname(dst)):
-        os.makedirs(dirname(dst))
-    if isfile(dst):
-        return
-    shutil.copy(src, dst)
 
 tasks = [
         ["gambling", "mb", "pe0"],
@@ -33,8 +26,8 @@ def transfer_func(session_path, subject, session, dst_dir):
         task_dir = join(dst_dir, subject.replace("sub-", "").lower(), "func", "%s-%s" % (task_name, direction))
         dst = join(task_dir, filename)
 
-        _copy(filepath, join(task_dir, filename))
-        _copy(tsv_path, join(task_dir, tsv_name))
+        copy(filepath, join(task_dir, filename))
+        copy(tsv_path, join(task_dir, tsv_name))
 
 def transfer_anat(subject_path, subject, dst_dir):
     for anat in ["WM", "GM", "CSF"]:
@@ -42,7 +35,7 @@ def transfer_anat(subject_path, subject, dst_dir):
         src = join(subject_path, "anat", filename)
         if not isfile(src): continue
         dst = join(dst_dir, subject.replace("sub-", "").lower(), "anat", "%s_probseq.nii.gz" % anat.lower())
-        _copy(src, dst)
+        copy(src, dst)
 
 
 def main(root, dst_dir):
