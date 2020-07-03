@@ -1,6 +1,6 @@
 from glob import glob
 from tqdm import tqdm
-from helpers.helpers import copy
+from utils.os import copy
 from os.path import basename, dirname, isfile, join
 
 
@@ -23,7 +23,7 @@ def transfer_func(session_path, subject, session, dst_dir):
         filepath = join(session_path, "func", filename)
         tsv_path = join(session_path, "func", tsv_name)
         if not isfile(filepath): continue
-        task_dir = join(dst_dir, subject.replace("sub-", "").lower(), "func", "%s-%s" % (task_name, direction))
+        task_dir = join(dst_dir, subject.replace("sub-", "").lower(), "func", "%s-%s-%s" % (task_name, mb, direction))
         dst = join(task_dir, filename)
 
         copy(filepath, join(task_dir, filename))
@@ -53,7 +53,7 @@ def main(root, dst_dir):
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
-    root = "/Users/pbezuhov/Desktop/server/ramirezc/hcpdes_preprocessed_04-2020/derivatives/functional_derivatives/"
+    root = "/Users/pstetz/Desktop/server/ramirezc/hcpdes_preprocessed_04-2020/derivatives/functional_derivatives/"
     dst_dir = "/Volumes/hd_4tb/slowmo/data/fmri/connectome"
     main(root, dst_dir)
 
