@@ -1,5 +1,12 @@
 import pandas as pd
 
+ONSETS = [
+        "Go", "Target", "Anger", "Disgust",
+        "Neutral", "1", "Happy", "Baseline",
+        "NoGo", "Sad", "6", "Fear", "NonTarget"
+]
+
+
 def _onset_time(onsets, curr_time, max_time=1000):
     onset = onsets[onsets["ons"] < curr_time]
     onset = onset.sort_values("ons", ascending=False)
