@@ -10,7 +10,7 @@ from glob import glob
 from tqdm import tqdm
 from os.path import isdir, isfile, join
 
-from info.misc import INFO_ORDER
+from slowmo.info.misc import INFO_ORDER
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -46,10 +46,14 @@ def fmri_path(root, row):
     task = _get(row, "task")
     return join(root, project, time_map(time_session), subject, task)
 
+def meets_qa(task_dir, session, threshold=0.1):
+    regressors = glob(join(task_dir, f"*{session}*confounds_regressors.tsv"))
+    assert len(regressors) == 1, f"{len(regressors)}, {task_dir}"
+    df = pd.read_csv(regressors.pop(), sep="\t")
+    num_vols = df.shape[0]
+    discarded = len([c for c in df.columns if "motion_outlier" in c])
+    return discarded / num_vols <= threshold
 
-"""
-Helpers
-"""
 def cartesian(data, timepoints):
     ret = list()
     for x, y, z in data:
@@ -67,14 +71,6 @@ def row_images(root, row):
         anat[name]  = get_data(join(anat_dir, "%s_probseg.nii.gz" % name))
     return fmri, anat
 
-def _last_save(training_path):
-    training = glob(join(training_path, "*"))
-    if len(training) == 0:
-        return 0
-    i = max(training)
-    i = os.path.basename(i)
-    return int(i) + 1
-
 def setup_task_info():
     TR = _get(row, "TR")
     task = _get(row, "task")
@@ -91,10 +87,7 @@ def setup_info(row):
     return info
 
 def setup_voxels():
-    """
-    FIXME: need to sort also because so that way time can be saved by
-    loading the fMRI in chunks
-    """
+    # FIXME: need to sort also because so that way time can be saved by loading the fMRI in chunks
     available_volumes = np.load("./available_volumes.npy")
     training_voxels = cartesian( available_volumes, np.array(range(2, fmri.shape[3]-2)) )
     training_index = random.sample(range(len(training_voxels)), batch_size*10)
@@ -104,23 +97,6 @@ def row_images(row):
     row_path = fmri_path(join(root, "raw"), row)
     return fmri, anat
 
-def append_anat(anat, batch, x, y, z):
-    for name in anat:
-        batch[name].append(img_region(anat[name], x, y, z, r=RADIUS))
-
-def append_func(fmri, batch, x, y, z, t):
-    for name, timepoint in [
-            ("prev_1", t-1), ("prev_2", t-2),
-            ("next_1", t+1), ("next_2", t+2)
-            ]:
-        batch[name].append(img_region(fmri[:, :, :, timpoint], x, y, z, r=RADIUS))
-
-def append_mris():
-    row = mask_info(masks, fmri, grey, (x, y, z, t))
-    for name, value in [("x", x), ("y", y), ("z", z), ("t", t)]:
-        row[name] = value
-    info["mri"].append(row)
-
 def combine_info(info):
     mri    = pd.DataFrame(info["mri"])
     onsets = pd.DataFrame(info["onsets"])
@@ -129,27 +105,6 @@ def combine_info(info):
         df[key] = value
     return df[INFO_ORDER]
 
-def checkpoint()
-    info_df = combine_info(info)
-    if not isdir(input_folder):
-        os.makedirs(input_folder)
-    batch["info"] = pd.concat([
-        onsets, info, pd.DataFrame(mask_rows)
-    ], axis=1)
-
-    for name in batch:
-        arr = np.array(batch[name])
-        np.save(join(input_folder, f"{name}.npy"), arr)
-        batch[name].clear()
-
-    np.save(join(input_folder, "bold.npy"), np.array(bold_signal))
-
-    info_df.to_csv
-    bold_signal.clear(); mask_rows.clear(); onsets.clear()
-
-
-def append_onsets()
-    onsets.append(last_onset(onset_df, task, TR * t, max_time=1000))
 
 def gen_data(df, training_path, masks, root, batch_size=128):
     for i, row in df.iterrows():
@@ -165,15 +120,10 @@ def gen_data(df, training_path, masks, root, batch_size=128):
         training_voxels = setup_voxels()
         for j, voxel in tqdm(enumerate(training_voxels), total=len(training_voxels)):
             x, y, z, t = voxel
-            dst_batch = join(dst_group, "%02d" % (j // batch_size))
-
-            bold.append(fmri[x, y, z, t])
-            append_anat(anat, batch, x, y, z)
-            append_func(fmri, batch, x, y, z, t)
-            append_mri(fmri, anat, info, x, y, z, t)
-            append_onsets(fmri, info, t)
+            append_voxel(fmri, anat, info, batch, x, y, z, t)
 
             if (j + 1) % batch_size == 0:
+                dst_batch = join(dst_group, "%02d" % (j // batch_size))
                 checkpoint(info, batch, bold)
 
 
@@ -185,3 +135,8 @@ if __name__ == "__main__":
     training_path = join(root, "results", "training")
     gen_data(df, training_path, masks, root)
 
+"""
+batch[name].append(
+    np.stack((_load_volume(fmri, x, y, z, timepoint), grey_data), axis=3)
+)
+"""
