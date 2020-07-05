@@ -51,3 +51,12 @@ def nii_region(data, x, y, z, r = 4, shape="square"):
         y - r : y + r + 1,
         z - r : z + r + 1
     ]
+
+def _gen_avail_volumes(shape, radius):
+    x_min, x_max = radius, shape[0] - radius
+    y_min, y_max = radius, shape[1] - radius
+    z_min, z_max = radius, shape[2] - radius
+    return np.array([(x, y, z) for x in range(x_min, x_max)
+                      for y in range(y_min, y_max)
+                      for z in range(z_min, z_max)
+           ])
