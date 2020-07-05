@@ -4,30 +4,28 @@ Imports
 import numpy as np
 import pandas as pd
 
-"""
-Config
-"""
-redcap_cols = [
-        "ehi_handedness", # hand preference for spoon would be interesting too!
-        "demo_education",
-        "demo_age",
-        "demo_gender", # code this as is_male and is_female
-        "lang_nat",
-        "weight",
-        "height",
-        "hamd_total",
-        "hama_score",
-        "hourssleep", # recode 99 values to be 12
-        "feeltoday",
-        "demo_edu_years", # this needs to be cleaned
-        "whoqol7", # ability to concentrate
-        "whoqol1", # satisfied with life
-        "whoqol16", # satisfied with sleep
-        "phq_score", # would like to see how it compares with hamd hama
-        "masq_score2",
-        "masq_score3",
-        "rrq_12",
-]
+redcap_cols = {
+        "ehi_handedness": "handedness", # hand preference for spoon would be interesting too!
+        "demo_education": "education",
+        "demo_age": "age",
+        "lang_nat": "native_language",
+        "weight": "weight",
+        "height": "height",
+        "hamd_total": "hamd_total",
+        "hama_score": "hama_score",
+        "hourssleep": "hourssleep",
+        "feeltoday": "feeltoday",
+        "whoqol7": "whoqol7", # ability to concentrate
+        "whoqol1": "whoqol1", # satisfied with life
+        "whoqol16": "whoqol16", # satisfied with sleep
+        "phq_score": "phq_score", # would like to see how it compares with hamd hama
+        "masq_score2": "masq_score2",
+        "masq_score3": "masq_score3",
+        "participant_id": "subject",
+        "webneuroc_id": "login",
+        #"demo_edu_years", # this needs to be cleaned # I don't want to do that
+#        "rrq_12", # not in HCP-DES
+}
 wn_cols = [
         "emzcompk", "emzoverk", "g2fnk", # Act correlations
         "getcpA", "tdomnk", # RS correlations
@@ -35,32 +33,51 @@ wn_cols = [
         "esoadur2", # biotypes
 ]
 
-def setup_wn():
-    dfs = list()
-    for redcap_path, fmri_path, renaming in [
-            (hc_redcap_path, hc_fmri_path, rename_hc),
-            (des_redcap_path, des_fmri_path, rename_des)
-        ]:
-        redcap = pd.read_csv(redcap_path, low_memory=False)
-        redcap["participant_id"] = redcap["participant_id"].map(renaming)
-        redcap = redcap[["participant_id", "webneuroc_id"]].dropna()
-    #     redcap = redcap[redcap["participant_id"].notnull()]
-        redcap.rename(columns={"participant_id": "subNum", "webneuroc_id": "wn"}, inplace=True)
-        fmri = pd.read_csv(fmri_path)
-        fmri = pd.merge(fmri, redcap, on="subNum", how="inner")
-        dfs.append(fmri)
-    fmri = pd.concat(dfs)
+def ohe(df, variables):
+    for var in variables:
+        values = df[var].unique()
+        for val in values:
+            if np.isnan(val): continue
+            df["%s_%s" % (var, str(val).replace(".", "_"))] = (df[var] == val).astype(int)
+        df.drop(var, axis=1, inplace=True)
 
-def main(hc_redcap_path, des_redcap_path, wn_path):
-    wn = pd.read_excel(wn_path).replace(".", np.nan)
-    wn.rename(columns={"login": "wn"}, inplace=True)
-    df = pd.merge(fmri, wn, on="wn", how="inner")
-    df = pd.merge(wn, redcap, on="subject", how="inner")
+def combine_redcap(hc, des):
+    hc = hc[hc["webneuroc_id"].notnull()]
+    des = des[des["webneuroc_id"].notnull()]
+    hc["participant_id"] = hc["participant_id"].map(lambda x: "CONN%03d" % int(x))
+    des["participant_id"] = des["participant_id"].map(lambda x: "CONN%s" % x[:3])
+    des["is_des"] = 1
+    des["is_des"] = 0
+    redcap = pd.concat([hc, des]).reset_index(drop=True)
+    return redcap
+
+def setup_redcap(hc, des):
+    redcap = combine_redcap(hc, des)
+    redcap["is_female"] = (redcap["demo_gender"] == 1).astype(int)
+    redcap["is_male"]   = (redcap["demo_gender"] == 2).astype(int)
+    redcap.drop("demo_gender", axis=1, inplace=True)
+    redcap["hourssleep"] = redcap["hourssleep"].map(lambda x: x if x != 99 else 12)
+    redcap.rename(columns=redcap_cols, inplace=True)
+    redcap = redcap[list(redcap_cols.values()) + ["is_female", "is_male", "is_des"]]
+    ohe(redcap, ["native_language"])
+    return redcap
+
+def main(wn, hc, des, dst):
+    redcap = setup_redcap(hc, des)
+    wn = wn[wn_cols + ["login"]]
+    df = pd.merge(wn, redcap, on="login", how="inner")
+    df.drop(["subject", "login"], axis=1, inplace=True)
     df.to_csv(dst, index=False)
 
 if __name__ == "__main__":
-    hc_redcap_path  = "/Users/pbezuhov/Desktop/PHI/redcap/connhc.csv"
-    des_redcap_path = "/Users/pbezuhov/Desktop/PHI/redcap/conndes.csv"
-    wn_path         = "/Users/pbezuhov/Desktop/PHI/cognition/conn/DISC100313_WebNeuro_Data_2020-05-12_08-34-00.xls"
-    main(hc_redcap_path, des_redcap_path, wn_path)
+    wn_path = "/Volumes/hd_4tb/slowmo/data/PHI/cognition/DISC100313_WebNeuro_Data_2020-05-12_08-34-00.xls"
+    hc_redcap_path  = "/Volumes/hd_4tb/slowmo/data/PHI/redcap/ConnectomeProjectHea_DATA_2020-06-12_1336.csv"
+    des_redcap_path = "/Volumes/hd_4tb/slowmo/data/PHI/redcap/ConnectomeProject_DATA_2020-06-12_1336.csv"
+    dst = "/Users/pstetz/Desktop/subjects.csv"
+
+    wn = pd.read_excel(wn_path).replace(".", np.nan)
+    hc  = pd.read_csv(hc_redcap_path, low_memory=False)
+    des = pd.read_csv(des_redcap_path, low_memory=False)
+
+    main(wn, hc, des, dst)
 
