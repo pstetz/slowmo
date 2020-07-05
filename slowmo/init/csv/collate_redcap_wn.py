@@ -66,14 +66,14 @@ def main(wn, hc, des, dst):
     redcap = setup_redcap(hc, des)
     wn = wn[wn_cols + ["login"]]
     df = pd.merge(wn, redcap, on="login", how="inner")
-    df.drop(["subject", "login"], axis=1, inplace=True)
+    df.drop(["login"], axis=1, inplace=True)
     df.to_csv(dst, index=False)
 
 if __name__ == "__main__":
-    wn_path = "/Volumes/hd_4tb/slowmo/data/PHI/cognition/DISC100313_WebNeuro_Data_2020-05-12_08-34-00.xls"
-    hc_redcap_path  = "/Volumes/hd_4tb/slowmo/data/PHI/redcap/ConnectomeProjectHea_DATA_2020-06-12_1336.csv"
-    des_redcap_path = "/Volumes/hd_4tb/slowmo/data/PHI/redcap/ConnectomeProject_DATA_2020-06-12_1336.csv"
-    dst = "/Users/pstetz/Desktop/subjects.csv"
+    wn_path = "/Volumes/hd_4tb/slowmo/data/wn/DISC100313_WebNeuro_Data_2020-05-12_08-34-00.xls"
+    hc_redcap_path  = "/Volumes/hd_4tb/slowmo/data/redcap/ConnectomeProjectHea_DATA_2020-06-12_1336.csv"
+    des_redcap_path = "/Volumes/hd_4tb/slowmo/data/redcap/ConnectomeProject_DATA_2020-06-12_1336.csv"
+    dst = "/Volumes/hd_4tb/slowmo/data/wn_redcap.csv"
 
     wn = pd.read_excel(wn_path).replace(".", np.nan)
     hc  = pd.read_csv(hc_redcap_path, low_memory=False)
