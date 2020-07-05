@@ -10,8 +10,6 @@ from glob import glob
 from tqdm import tqdm
 from os.path import isdir, isfile, join
 
-from slowmo.info.misc import INFO_ORDER
-
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -54,12 +52,6 @@ def meets_qa(task_dir, session, threshold=0.1):
     discarded = len([c for c in df.columns if "motion_outlier" in c])
     return discarded / num_vols <= threshold
 
-def cartesian(data, timepoints):
-    ret = list()
-    for x, y, z in data:
-        for t in timepoints:
-            ret.append((x, y, z, t))
-    return ret
 
 def row_images(root, row):
     row_path = join(root, row["subject"], "func", row["task"])
@@ -77,21 +69,14 @@ def setup_task_info():
     print(i, _get(row, "project"), _get(row, "subject"), _get(row, "task"))
     return task_info
 
-def setup_info(row):
+def setup_info(row, session, task):
     info = dict()
     info["general"] = dict()
     info["mri"] = list(); info["onsets"] = list()
-    for key, value in row.items():
+    for key, value in row.items()
         if key in ONSETS_ORDER.keys():
             info["general"][key] = value
     return info
-
-def setup_voxels():
-    # FIXME: need to sort also because so that way time can be saved by loading the fMRI in chunks
-    available_volumes = np.load("./available_volumes.npy")
-    training_voxels = cartesian( available_volumes, np.array(range(2, fmri.shape[3]-2)) )
-    training_index = random.sample(range(len(training_voxels)), batch_size*10)
-    return training_voxels
 
 def row_images(row):
     row_path = fmri_path(join(root, "raw"), row)
@@ -105,35 +90,52 @@ def combine_info(info):
         df[key] = value
     return df[INFO_ORDER]
 
+def gen_data(training_path, masks, root, batch_size=128):
+    session = "ses-00" # FIXME: get ses-01 too
+    df = pd.read_csv(root, "wn_redcap.csv")
+    df = df[df["subject"] == subject]
+    for row in df.iterrows():
+        subject = basename(subject_path)
+        for task in tasks:
+            dst_group = join(train_path, f"{subject}_{session}_{task}")
+            if glob(join(dst_group, "*")): continue
 
-def gen_data(df, training_path, masks, root, batch_size=128):
-    for i, row in df.iterrows():
-        dst_group = join(train_path, "%04d" % i)
-        if glob(join(dst_group, "*")): continue
+            info = setup_info(root, subject, session, task)
+            fmri, anat = row_images(root, subject, session, task)
 
-        info = setup_info(row)
-        fmri, anat = row_images(row)
+            batch = {name: list() for name in ["prev_1", "prev_2", "next_1", "next_2", "gm", "wm", "csf"]}
+            bold_signal = list()
 
-        batch = {name: list() for name in ["prev_1", "prev_2", "next_1", "next_2", "gm", "wm", "csf"]}
-        bold_signal = list()
+            training_voxels = setup_voxels()
+            for j, voxel in tqdm(enumerate(training_voxels), total=len(training_voxels)):
+                x, y, z, t = voxel
+                append_voxel(fmri, anat, info, batch, x, y, z, t)
 
-        training_voxels = setup_voxels()
-        for j, voxel in tqdm(enumerate(training_voxels), total=len(training_voxels)):
-            x, y, z, t = voxel
-            append_voxel(fmri, anat, info, batch, x, y, z, t)
+                if (j + 1) % batch_size == 0:
+                    dst_batch = join(dst_group, "%02d" % (j // batch_size))
+                    checkpoint(info, batch, bold)
 
-            if (j + 1) % batch_size == 0:
-                dst_batch = join(dst_group, "%02d" % (j // batch_size))
-                checkpoint(info, batch, bold)
+tasks = {
+    "gonogo-sb-pe0",
+    "conscious-sb-pe0",
+    "nonconscious-sb-pe0",
+    "rest-mb-pe0",
+    "rest-mb-pe1",
+#    "wm-mb-pe0",
+#    "wm-sb-pe0",
+#    "gambling-mb-pe0",
+#    "emotion-mb-pe0",
+}
 
+with open("../info/order.json", "r") as f:
+    INFO_ORDER = json.load(f)
 
 if __name__ == "__main__":
     root = "/Volumes/hd_4tb/slowmo/data"
     assert os.path.isdir(root), "Connect external harddrive!  Cannot find %s" % root
     masks = load_masks( join(root, "masks", "plip") )
-    df            = pd.read_csv(join(root, "project", "model_input.csv"))
     training_path = join(root, "results", "training")
-    gen_data(df, training_path, masks, root)
+    gen_data(training_path, masks, root)
 
 """
 batch[name].append(

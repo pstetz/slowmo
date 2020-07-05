@@ -1,3 +1,9 @@
+import os
+import numpy as np
+import pandas as pd
+from glob import glob
+from os.path import dirname, join
+
 def append_anat(anat, batch, x, y, z):
     for name in anat:
         batch[name].append(img_region(anat[name], x, y, z, r=RADIUS))
@@ -15,7 +21,7 @@ def append_mris():
         row[name] = value
     info["mri"].append(row)
 
-def checkpoint()
+def checkpoint(dst_dir)
     info_df = combine_info(info)
     if not isdir(input_folder):
         os.makedirs(input_folder)

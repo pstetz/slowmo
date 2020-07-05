@@ -44,6 +44,16 @@ def norm_image(data, mask_data):
     norm_data[np.isnan(norm_data)] = 0
     return norm_data.astype(np.float32)
 
+def setup_voxels(timepoints=2, filepath="../info/available_volumes.npy"):
+    # FIXME: need to sort also because so that way time can be saved by loading the fMRI in chunks
+    available_volumes = np.load(filepath)
+    training_voxels = cartesian(
+        available_volumes,
+        np.array(range(timepoints, fmri.shape[3]-timepoints))
+    )
+    training_index = random.sample(range(len(training_voxels)), batch_size*10)
+    return training_voxels
+
 def nii_region(data, x, y, z, r = 4, shape="square"):
     assert shape == "square" # A ball would be helpful too
     return data[
@@ -60,3 +70,10 @@ def _gen_avail_volumes(shape, radius):
                       for y in range(y_min, y_max)
                       for z in range(z_min, z_max)
            ])
+
+def cartesian(data, timepoints):
+    ret = list()
+    for x, y, z in data:
+        for t in timepoints:
+            ret.append((x, y, z, t))
+    return ret
