@@ -1,14 +1,17 @@
+import random
 import numpy as np
+import pandas as pd
 import nibabel as nib
-from os.path import isfile
+from glob import glob
+from os.path import abspath, dirname, isfile, join
 
 def load_image(filepath):
     return nib.as_closest_canonical(nib.load(filepath))
 
 def get_data(image):
     if type(image) == str and isfile(image):
-        return load_image(image).get_data()
-    return image.get_data()
+        return load_image(image).get_fdata()
+    return image.get_fdata()
 
 def std_image(data, axis=3):
     """ Gets the std of the image over time """
@@ -44,16 +47,6 @@ def norm_image(data, mask_data):
     norm_data[np.isnan(norm_data)] = 0
     return norm_data.astype(np.float32)
 
-def setup_voxels(timepoints=2, filepath="../info/available_volumes.npy"):
-    # FIXME: need to sort also because so that way time can be saved by loading the fMRI in chunks
-    available_volumes = np.load(filepath)
-    training_voxels = cartesian(
-        available_volumes,
-        np.array(range(timepoints, fmri.shape[3]-timepoints))
-    )
-    training_index = random.sample(range(len(training_voxels)), batch_size*10)
-    return training_voxels
-
 def nii_region(data, x, y, z, r = 4, shape="square"):
     assert shape == "square" # A ball would be helpful too
     return data[
@@ -62,6 +55,37 @@ def nii_region(data, x, y, z, r = 4, shape="square"):
         z - r : z + r + 1
     ]
 
+def cartesian(data, timepoints):
+    ret = list()
+    for x, y, z in data:
+        for t in timepoints:
+            ret.append((x, y, z, t))
+    return ret
+
+def load_volume(fmri, x, y, z, t):
+    volume = nii_input(fmri[:, :, :, t], x, y, z)
+    return np.array(volume)
+
+def mean_activation(masks, fmri, grey, t, label):
+    activations = dict()
+    for mask in masks:
+        code, data = mask["code"], mask["data"]
+        region = np.multiply(data, fmri[:, :, :, t])
+        activations["mean_%s_%s" % (code, label)] = np.mean( np.multiply(grey, region) )
+    return activations
+
+def in_mask(masks, x, y, z):
+    """
+    NOTE: Since the coordinates are an input I will not use this
+    """
+    result = dict()
+    for mask in masks:
+        code = mask["code"]
+        data = mask["data"]
+        result["in_%s" % code] = int(bool(data[x, y, z]))
+    return result
+
+"""
 def _gen_avail_volumes(shape, radius):
     x_min, x_max = radius, shape[0] - radius
     y_min, y_max = radius, shape[1] - radius
@@ -70,10 +94,4 @@ def _gen_avail_volumes(shape, radius):
                       for y in range(y_min, y_max)
                       for z in range(z_min, z_max)
            ])
-
-def cartesian(data, timepoints):
-    ret = list()
-    for x, y, z in data:
-        for t in timepoints:
-            ret.append((x, y, z, t))
-    return ret
+"""
