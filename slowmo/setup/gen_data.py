@@ -50,6 +50,7 @@ def setup_voxels(dim4, batch_size, skip=2):
     )
     training_index = random.sample(range(len(training_voxels)), batch_size*10)
     training_voxels = [training_voxels[i] for i in training_index]
+    training_voxels.sort(key=lambda x: x[-1]) # sort by time
     return training_voxels
 
 def mask_info(masks, fmri, grey, coord):
@@ -87,7 +88,7 @@ def append_mri(task_dir, session, masks, fmri, anat, info, x, y, z, t):
 def combine_info(info):
     mri    = pd.DataFrame(info["mri"])
     onsets = pd.DataFrame(info["onsets"])
-    df = pd.concat([mri, onsets], ignore_index=True, axis=0) #FIXME: double check the shape
+    df = pd.concat([mri, onsets], axis=1) #FIXME: double check the shape
     for key, value in info["general"].items():
         df[key] = value
     return df[INFO_ORDER.keys()]
@@ -103,8 +104,7 @@ def checkpoint(info, batch, bold, dst_dir):
 
     np.save(join(dst_dir, "bold.npy"), np.array(bold))
     info_df.to_csv(join(dst_dir, "info.csv"), index=False)
-    info["mri"].clear(); info["onsets"].clear()
-    bold.clear(); mask_rows.clear(); onsets.clear()
+    info["mri"].clear(); info["onsets"].clear(); bold.clear()
 
 def append_onsets(info, onset_csv, task, TR, t):
     task = task.split("-")[0]
@@ -159,23 +159,23 @@ def load_masks(mask_dir):
     } for mask in masks]
     return masks
 
-def gen_data(training_path, masks, root, batch_size=12):
+def gen_data(training_path, masks, root, batch_size=128):
     session = "ses-00" # FIXME: get ses-01 too
     df = pd.read_csv(join(root, "wn_redcap.csv"))
     for i, row in df.iterrows():
         subject = row["subject"].lower()
         subject_dir = join(root, "fmri", "connectome", subject)
         for task in tasks:
+            print(subject, session, task)
             TR = 0.71 if task.split("-")[1] == "mb" else 2
             task_dir = join(subject_dir, "func", task)
             if task in {"wm-mb-pe0", "wm-sb-pe0", "gambling-mb-pe0", "emotion-mb-pe0"}: continue # FIXME: get rid of this
-            fmri, anat = row_images(subject_dir, session, task)
-            if fmri is False or anat is False: continue
-            onset_csv = join(task_dir, "onsets.csv")
-            if not task.startswith("rest") and not isfile(onset_csv): continue
             dst_group = join(training_path, f"{subject}_{session}_{task}")
             if glob(join(dst_group, "*")): continue
-            print(subject, session, task)
+            onset_csv = join(task_dir, "onsets.csv")
+            if not task.startswith("rest") and not isfile(onset_csv): continue
+            fmri, anat = row_images(subject_dir, session, task)
+            if fmri is False or anat is False: continue
 
             info = setup_info(row, task)
 
@@ -217,6 +217,6 @@ if __name__ == "__main__":
     root = "/Volumes/hd_4tb/slowmo/data"
     assert os.path.isdir(root), "Connect external harddrive!  Cannot find %s" % root
     masks = load_masks( join(root, "masks", "plip") )
-    training_path = join(root, "results", "training")
+    training_path = join(root, "..", "results", "training")
     gen_data(training_path, masks, root)
 
