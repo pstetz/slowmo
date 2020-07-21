@@ -28,10 +28,12 @@ redcap_cols = {
 }
 wn_cols = [
         # Act correlations
-        "emzcompk", "emzoverk", "g2fnk",
+        "emzcompk",
+        "emzoverk",
+        "g2fnk", # Number of times when the spacebar was not pressed in response to a green `press` stimulus- measures innattention or slow responding
 
         # RS correlations
-        "getcpA",
+        "getcpA", # Percentage of correctly identified `Anger` faces
         "tdomnk", # Number of times subjects was able to tap the spacebar in 30 seconds with their dominant hand
 
         # PPI
