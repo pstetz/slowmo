@@ -27,10 +27,18 @@ redcap_cols = {
 #        "rrq_12", # not in HCP-DES
 }
 wn_cols = [
-        "emzcompk", "emzoverk", "g2fnk", # Act correlations
-        "getcpA", "tdomnk", # RS correlations
-        "ecoackII", # PPI
-        "esoadur2", # biotypes
+        # Act correlations
+        "emzcompk", "emzoverk", "g2fnk",
+
+        # RS correlations
+        "getcpA",
+        "tdomnk", # Number of times subjects was able to tap the spacebar in 30 seconds with their dominant hand
+
+        # PPI
+        "ecoackII",
+
+        # biotypes
+        "esoadur2",
 ]
 
 def ohe(df, variables):
@@ -43,7 +51,9 @@ def ohe(df, variables):
 
 def combine_redcap(hc, des):
     hc = hc[hc["webneuroc_id"].notnull()]
+    hc = hc[hc["redcap_event_name"] == "part_1_arm_1"]
     des = des[des["webneuroc_id"].notnull()]
+    des = des[des["redcap_event_name"] == "part_1_arm_1"]
     hc["participant_id"] = hc["participant_id"].map(lambda x: "CONN%03d" % int(x))
     des["participant_id"] = des["participant_id"].map(lambda x: "CONN%s" % x[:3])
     des["is_des"] = 1
@@ -64,6 +74,7 @@ def setup_redcap(hc, des):
 
 def main(wn, hc, des, dst):
     redcap = setup_redcap(hc, des)
+    wn = wn[wn["suffix"] == 1] # only first session
     wn = wn[wn_cols + ["login"]]
     df = pd.merge(wn, redcap, on="login", how="inner")
     df.drop(["login"], axis=1, inplace=True)

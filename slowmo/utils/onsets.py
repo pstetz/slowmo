@@ -10,8 +10,19 @@ def onset_time(onsets, curr_time, max_time=1000):
     return max_time
 
 def stim_times(df, stimuli, curr_time):
-    stim = df[df.category == stimuli]
-    return onset_time(stim, curr_time)
+    curr_cat = None
+    first = None; last = None
+    df.sort_values("ons", ascending=True, inplace=True)
+    df = df[df["category"] != "keypress"]
+    for i, row in df.iterrows():
+        if row["ons"] > curr_time: break
+        if row["category"] != stimuli:
+            curr_cat = row["category"]
+            continue
+        if row["category"] != curr_cat: first = curr_time - row["ons"]
+        last = curr_time - row["ons"]
+        curr_cat = row["category"]
+    return first, last
 
 def keypress_times(df, button, curr_time):
     df.fillna(0, inplace=True)
@@ -33,17 +44,19 @@ def last_onset(onset_csv, task, curr_time, max_time=1000):
         "gambling":     ["Win", "Loss"]
     }
     all_stimuli  = set(np.concatenate(list(task_stimuli.values())))
-    all_stimuli.update(["1", "6"])
-    onset_timing = {stimuli: max_time for stimuli in all_stimuli}
+    onset_timing = {stimuli + tail: max_time for stimuli in all_stimuli for tail in ["_first", "_last"]}
+    onset_timing["1"] = max_time
+    onset_timing["6"] = max_time
     if task == "rest": return onset_timing
-    onset_df = pd.read_scv(onset_csv)
+    onset_df = pd.read_csv(onset_csv)
     for button in ["1", "6"]:
         onset_timing[button] = keypress_times(onset_df, button, curr_time)
 
     for stimuli in task_stimuli[task]:
-        _time = stim_times(onset_df, stimuli, curr_time)
-        if _time:
-            onset_timing[stimuli] = _time
+        first, last = stim_times(onset_df, stimuli, curr_time)
+        if last:
+            onset_timing[stimuli + "_first"] = first
+            onset_timing[stimuli + "_last" ] = last
     return onset_timing
 
 """
