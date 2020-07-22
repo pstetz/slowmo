@@ -57,6 +57,11 @@ def setup_voxels(dim4, batch_size, skip=2):
     training_voxels.sort(key=lambda x: x[-1]) # sort by time
     return training_voxels
 
+def mask_cache(masks, fmri, grey, t):
+    if t not in MASK_CACHE:
+        MASK_CACHE[t] = mri.mean_activation(masks, fmri, grey, t)
+    return MASK_CACHE[t]
+
 def mask_info(masks, fmri, grey, t):
     info = dict()
     for timepoint, label in [
