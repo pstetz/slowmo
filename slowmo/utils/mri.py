@@ -11,6 +11,8 @@ def load_image(filepath):
 def get_data(image):
     if type(image) == str and isfile(image):
         return load_image(image).get_fdata()
+    if type(image) == str:
+        raise Exception("File not found: %s" % image)
     return image.get_fdata()
 
 def std_image(data, axis=3):
@@ -66,12 +68,12 @@ def load_volume(fmri, x, y, z, t):
     volume = nii_input(fmri[:, :, :, t], x, y, z)
     return np.array(volume)
 
-def mean_activation(masks, fmri, grey, t, label):
+def mean_activation(masks, fmri, grey, t):
     activations = dict()
     for mask in masks:
         code, data = mask["code"], mask["data"]
         region = np.multiply(data, fmri[:, :, :, t])
-        activations["mean_%s_%s" % (code, label)] = np.mean( np.multiply(grey, region) )
+        activations["mean_%s" % code] = np.mean( np.multiply(grey, region) )
     return activations
 
 def in_mask(masks, x, y, z):

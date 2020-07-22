@@ -18,26 +18,30 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 import slowmo.utils.mri as mri
 from slowmo.utils.onsets import last_onset
+from slowmo.utils.mri import load_image, save_image, get_data, norm_image
 
-def meets_qa(task_dir, session, threshold=0.1):
-    regressors = glob(join(task_dir, f"*{session}*confounds_regressors.tsv"))
-    assert len(regressors) == 1, f"{len(regressors)}, {task_dir}"
-    df = pd.read_csv(regressors.pop(), sep="\t")
+def meets_qa(nifti_path, threshold=0.1):
+    df = get_confounds(nifti_path)
     num_vols = df.shape[0]
     discarded = len([c for c in df.columns if "motion_outlier" in c])
     return discarded / num_vols <= threshold
 
-def fmriprep_cols(row, task_dir, session, t):
+def get_confounds(nifti_path):
+    nifti_tail = "_space-MNI152NLin6Asym_desc-smoothAROMAnonaggr_bold.nii.gz"
+    confounds_tail = "_desc-confounds_regressors.tsv"
+    filename = basename(nifti_path).replace(nifti_tail, confounds_tail)
+    filepath = join(dirname(nifti_path), filename)
+    return pd.read_csv(filepath, sep="\t")
+
+def fmriprep_cols(row, confound_df, t):
     """
     Really trusting Chris here!  Don't want to use aCompCor because
     the data may be denoised already and the number of vectors varies
     https://neurostars.org/t/confounds-from-fmriprep-which-one-would-you-use-for-glm/326/2
     """
     cols = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z", "framewise_displacement"]
-    filepath = glob(join(task_dir, f"*{session}_*-confounds_regressors.tsv")).pop()
-    df = pd.read_csv(filepath, sep="\t")
     for col in cols:
-        row[col] = df.loc[t, col]
+        row[col] = confound_df.loc[t, col]
     return row
 
 def setup_voxels(dim4, batch_size, skip=2):
@@ -53,18 +57,15 @@ def setup_voxels(dim4, batch_size, skip=2):
     training_voxels.sort(key=lambda x: x[-1]) # sort by time
     return training_voxels
 
-def mask_info(masks, fmri, grey, coord):
-    x, y, z, t = coord
-    info = mri.in_mask(masks, x, y, z)
+def mask_info(masks, fmri, grey, t):
+    info = dict()
     for timepoint, label in [
             (t-1, "prev_1"), (t-2, "prev_2"),
             (t+1, "next_1"), (t+2, "next_2")
     ]:
-        info = {**info, **mri.mean_activation(masks, fmri, grey, timepoint, label)}
-    info["x"] = x
-    info["y"] = y
-    info["z"] = z
-    info["t"] = t
+        mask_values = mask_cache(masks, fmri, grey, timepoint)
+        for mask in mask_values:
+            info["%s_%s" % (mask, label)] = mask_values[mask]
     return info
 
 def append_anat(anat, batch, x, y, z):
@@ -78,11 +79,11 @@ def append_func(fmri, batch, x, y, z, t):
             ]:
         batch[name].append(mri.nii_region(fmri[:, :, :, timepoint], x, y, z, r=RADIUS))
 
-def append_mri(task_dir, session, masks, fmri, anat, info, x, y, z, t):
-    row = mask_info(masks, fmri, anat["gm"], (x, y, z, t))
+def append_mri(confound_df, masks, fmri, anat, info, x, y, z, t):
+    row = mask_info(masks, fmri, anat["gm"], t)
     for name, value in [("x", x), ("y", y), ("z", z), ("t", t)]:
         row[name] = value
-    row = fmriprep_cols(row, task_dir, session, t)
+    row = fmriprep_cols(row, confound_df, t)
     info["mri"].append(row)
 
 def combine_info(info):
@@ -91,7 +92,10 @@ def combine_info(info):
     df = pd.concat([mri, onsets], axis=1) #FIXME: double check the shape
     for key, value in info["general"].items():
         df[key] = value
-    return df[INFO_ORDER.keys()]
+    order = [np.nan] * len(INFO_ORDER)
+    for key, val in INFO_ORDER.items():
+        order[val] = key
+    return df[order]
 
 def checkpoint(info, batch, bold, dst_dir):
     if not isdir(dst_dir):
@@ -127,7 +131,7 @@ def setup_info(row, task):
     for key, value in row.items():
         if key in INFO_ORDER.keys():
             info["general"][key] = value
-    for name in tasks:
+    for name in TASKS:
         name = name.split("-")[0]
         if name == "wm": name = "workingmemory"
         info["general"][f"is_{name}"] = int(name == task.split("-")[0])
@@ -135,59 +139,108 @@ def setup_info(row, task):
     info["general"]["is_mb"] = int(task.split("-")[1] == "mb")
     return info
 
-def row_images(subject_dir, session, task):
-    task_dir = join(subject_dir, "func", task)
-    if not isdir(task_dir): return False, False
-    filepath = glob(join(task_dir, f"{session}_*_standardized.nii.gz"))
-    if len(filepath) == 0:
-        return False, False
-    if not meets_qa(task_dir, session):
-        return False, False
-    fmri     = mri.get_data(filepath.pop())
+def get_raw_func(task_path):
+    if not meets_qa(task_path):
+        return False
 
+    # Normalizes the brain image
+    mask = "/share/leanew1/pstetz/masks/MNI152_T1_2mm_brain_mask.nii"
+    fmri   = load_image(task_path)
+    data   = get_data(fmri)
+    mask_data = get_data(mask)
+    norm_data = norm_image(data, mask_data)
+    tmp_path = join(TMP_DIR, basename(task_path))
+    save_image(norm_data, tmp_path, affine=fmri.affine)
+    norm_data = get_data(tmp_path)
+    return norm_data
+
+def resample(src, dst):
+    from slowmo.utils.fsl_command import fsl_command
+    reference = "/share/leanew1/pstetz/masks/MNI152_T1_2mm_brain_mask.nii"
+    fsl_command("flirt", "-in", src, "-ref", reference, "-out", dst, "-applyxfm")
+
+def get_raw_anat(subject_dir):
+    # Need to resample data
     anat = dict()
     anat_dir = join(subject_dir, "anat")
     for name in ["gm", "wm", "csf"]:
-        anat[name] = mri.get_data(join(anat_dir, "%s_probseg_resampled.nii.gz" % name))
+        search = join(anat_dir, "*_space-MNI152NLin6Asym_label-%s_probseg.nii.gz" % name.upper())
+        matches = glob(search)
+        assert len(matches) < 2, "Duplicate structurals in %s" % matches
+        assert len(matches) != 0, "No structurals in %s" % search
+        filepath = matches.pop()
+        tmp_filepath = join(TMP_DIR, basename(filepath))
+        resample(filepath, tmp_filepath)
+        anat[name] = mri.get_data(tmp_filepath)
+    return anat
+
+def row_images(subject_dir, task_path):
+    fmri = get_raw_func(task_path)
+    if fmri is False:
+        return False, False
+
+    anat = get_raw_anat(subject_dir)
     return fmri, anat
 
 def load_masks(mask_dir):
-    masks = glob(join(mask_dir, "*"))
+    masks = glob(join(mask_dir, "*.nii"))
     masks = [{
         "code": basename(mask).split("_")[0],
         "data": nib.load(mask).get_fdata(),
     } for mask in masks]
     return masks
 
-def gen_data(training_path, masks, root, batch_size=128):
-    session = "ses-00" # FIXME: get ses-01 too
-    df = pd.read_csv(join(root, "wn_redcap.csv"))
+def bids_info(filepath, tag):
+    filename = basename(filepath)
+    info = [elem for elem in filename.split("_") if elem.startswith(tag)]
+    assert len(info) == 1
+    return info.pop().split("-")[1]
+
+def get_avail_tasks(subject_dir):
+    tasks = list()
+    for session_path in glob(join(subject_dir, "ses-*")):
+        session = basename(session_path)
+        for task_path in glob(join(session_path, "func", "*-smoothAROMAnonaggr_bold.nii.gz")):
+            task = bids_info(task_path, "task")
+            acq = bids_info(task_path, "acq")
+            pe = bids_info(task_path, "dir")
+            taskname = f"{task}-{acq}-{pe}"
+            if not taskname in TASKS: continue
+            tasks.append((taskname, task_path))
+    return tasks
+
+def gen_data(src_dir, but_dir, dst_dir, df, masks, batch_size=128):
     for i, row in df.iterrows():
         subject = row["subject"].lower()
-        subject_dir = join(root, "fmri", "connectome", subject)
-        for task in tasks:
-            print(subject, session, task)
+        bids_sub = "sub-" + subject.upper()
+        subject_dir = join(src_dir, bids_sub)
+        task_avail = get_avail_tasks(subject_dir)
+        for task, task_path in task_avail:
+            session = "ses-" + bids_info(task_path, "ses")
             TR = 0.71 if task.split("-")[1] == "mb" else 2
-            task_dir = join(subject_dir, "func", task)
             if task in {"wm-mb-pe0", "wm-sb-pe0", "gambling-mb-pe0", "emotion-mb-pe0"}: continue # FIXME: get rid of this
-            dst_group = join(training_path, f"{subject}_{session}_{task}")
+            dst_group = join(dst_dir, f"{subject}_{session}_{task}")
             if glob(join(dst_group, "*")): continue
-            onset_csv = join(task_dir, "onsets.csv")
+            onset_csv = join(but_dir, subject, task, "onsets.csv")
             if not task.startswith("rest") and not isfile(onset_csv): continue
-            fmri, anat = row_images(subject_dir, session, task)
+            fmri, anat = row_images(subject_dir, task_path)
             if fmri is False or anat is False: continue
+            confound_df = get_confounds(task_path)
+            print(subject, task, session)
 
             info = setup_info(row, task)
-
             batch = {name: list() for name in ["prev_1", "prev_2", "next_1", "next_2", "gm", "wm", "csf"]}
             bold = list()
 
             training_voxels = setup_voxels(fmri.shape[-1], batch_size)
+            #FMRI_SIZE = 10
+            #use_fmri = fmri[:, :, :, :FMRI_SIZE]
             for j, voxel in tqdm(enumerate(training_voxels), total=len(training_voxels)):
+
                 x, y, z, t = voxel
                 bold.append(fmri[x, y, z, t])
 
-                append_mri(task_dir, session, masks, fmri, anat, info, x, y, z, t)
+                append_mri(confound_df, masks, fmri, anat, info, x, y, z, t)
                 append_onsets(info, onset_csv, task, TR, t)
                 append_anat(anat, batch, x, y, z)
                 append_func(fmri, batch, x, y, z, t)
@@ -195,8 +248,10 @@ def gen_data(training_path, masks, root, batch_size=128):
                 if (j + 1) % batch_size == 0:
                     dst_dir = join(dst_group, "%02d" % (j // batch_size))
                     checkpoint(info, batch, bold, dst_dir)
+            MASK_CACHE.clear()
+        [os.remove(f) for f in glob(TMP_DIR + "/*.nii.gz")]
 
-tasks = {
+TASKS = {
     "gonogo-sb-pe0",
     "conscious-sb-pe0",
     "nonconscious-sb-pe0",
@@ -212,11 +267,15 @@ with open(join(dirname(abspath(__file__)), "../info/order.json"), "r") as f:
     INFO_ORDER = json.load(f)
 
 RADIUS = 4
+TMP_DIR = "/scratch/pstetz/.slow"
+MASK_CACHE = dict()
 
 if __name__ == "__main__":
-    root = "/Volumes/hd_4tb/slowmo/data"
-    assert os.path.isdir(root), "Connect external harddrive!  Cannot find %s" % root
-    masks = load_masks( join(root, "masks", "plip") )
-    training_path = join(root, "..", "results", "training")
-    gen_data(training_path, masks, root)
+    src_dir = "/oak/stanford/groups/leanew1/ramirezc/hcpdes_preprocessed_04-2020/derivatives/functional_derivatives"
+    dst_dir = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/training"
+    but_dir = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/onsets"
+    wn_path = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/wn_redcap.csv"
+    df = pd.read_csv(wn_path)
+    masks = load_masks( "/scratch/pstetz/.slow/masks" )
+    gen_data(src_dir, but_dir, dst_dir, df, masks)
 
