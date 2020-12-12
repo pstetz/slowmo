@@ -3,7 +3,7 @@ import sys
 from tqdm import tqdm
 from glob import glob
 from os.path import basename, dirname, isdir, isfile, join
-from utils.os import copy
+from slowmo.utils.os import copy
 
 tasks = {
         "gonogo": "gonogo-sb-pe0",
@@ -20,11 +20,11 @@ def transfer(root, dst_dir):
         for task in tasks:
             onset_file = join(subject_path, "s1", task, "key_onsets/onsets.csv")
             if not isfile(onset_file): continue
-            dst = join(dst_dir, subject, "func", tasks[task], "onsets.csv")
+            dst = join(dst_dir, subject, tasks[task], "onsets.csv")
             copy(onset_file, dst)
 
 if __name__ == "__main__":
-    root = "/Volumes/group/PANLab_Datasets/CONNECTOME/button"
-    dst_dir = "/Volumes/hd_4tb/slowmo/data/fmri/connectome"
+    root = "/share/leanew1/PANLab_Datasets/CONNECTOME/button"
+    dst_dir = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/onsets"
     transfer(root, dst_dir)
 
