@@ -205,6 +205,7 @@ def get_avail_tasks(subject_dir):
     tasks = list()
     for session_path in glob(join(subject_dir, "ses-*")):
         session = basename(session_path)
+        if session not in {"ses-00", "ses-01"}: continue # FIXME: hacky but only want baseline
         for task_path in glob(join(session_path, "func", "*-smoothAROMAnonaggr_bold.nii.gz")):
             task = bids_info(task_path, "task")
             acq = bids_info(task_path, "acq")
@@ -215,6 +216,7 @@ def get_avail_tasks(subject_dir):
     return tasks
 
 def gen_data(src_dir, but_dir, dst_dir, df, masks, batch_size=128):
+    # FIXME: make the batch_size way bigger for next round!
     for i, row in df.iterrows():
         subject = row["subject"].lower()
         bids_sub = "sub-" + subject.upper()
@@ -223,7 +225,6 @@ def gen_data(src_dir, but_dir, dst_dir, df, masks, batch_size=128):
         for task, task_path in task_avail:
             session = "ses-" + bids_info(task_path, "ses")
             TR = 0.71 if task.split("-")[1] == "mb" else 2
-            if task in {"wm-mb-pe0", "wm-sb-pe0", "gambling-mb-pe0", "emotion-mb-pe0"}: continue # FIXME: get rid of this
             dst_group = join(dst_dir, f"{subject}_{session}_{task}")
             if glob(join(dst_group, "*")): continue
             onset_csv = join(but_dir, subject, task, "onsets.csv")
@@ -231,15 +232,13 @@ def gen_data(src_dir, but_dir, dst_dir, df, masks, batch_size=128):
             fmri, anat = row_images(subject_dir, task_path)
             if fmri is False or anat is False: continue
             confound_df = get_confounds(task_path)
-            print(subject, task, session)
+            print(dst_group)
 
             info = setup_info(row, task)
             batch = {name: list() for name in ["prev_1", "prev_2", "next_1", "next_2", "gm", "wm", "csf"]}
             bold = list()
 
             training_voxels = setup_voxels(fmri.shape[-1], batch_size)
-            #FMRI_SIZE = 10
-            #use_fmri = fmri[:, :, :, :FMRI_SIZE]
             for j, voxel in tqdm(enumerate(training_voxels), total=len(training_voxels)):
 
                 x, y, z, t = voxel
@@ -251,8 +250,8 @@ def gen_data(src_dir, but_dir, dst_dir, df, masks, batch_size=128):
                 append_func(fmri, batch, x, y, z, t)
 
                 if (j + 1) % batch_size == 0:
-                    dst_dir = join(dst_group, "%02d" % (j // batch_size))
-                    checkpoint(info, batch, bold, dst_dir)
+                    dst_batch = join(dst_group, "%02d" % (j // batch_size))
+                    checkpoint(info, batch, bold, dst_batch)
             MASK_CACHE.clear()
         [os.remove(f) for f in glob(TMP_DIR + "/*.nii.gz")]
 
@@ -276,7 +275,7 @@ TMP_DIR = "/scratch/pstetz/.slow"
 MASK_CACHE = dict()
 
 if __name__ == "__main__":
-    src_dir = "/oak/stanford/groups/leanew1/ramirezc/hcpdes_preprocessed_04-2020/derivatives/functional_derivatives"
+    src_dir = "/oak/stanford/groups/leanew1/ramirezc/hcpdes_latest/derivatives/functional_derivatives/fmriprep"
     dst_dir = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/training"
     but_dir = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/onsets"
     wn_path = "/oak/stanford/groups/leanew1/users/pstetz/.slowmo/wn_redcap.csv"
